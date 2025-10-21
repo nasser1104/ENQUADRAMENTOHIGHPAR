@@ -106,6 +106,15 @@
             .no-print {
                 display: none !important;
             }
+            /* Hide main app root when printing presentation */
+            body > #root {
+                display: block;
+            }
+            @media print {
+                body > #root {
+                    display: none !important;
+                }
+            }
         }
     </style>
 </head>
@@ -327,7 +336,7 @@
             );
 
             return (
-                <aside className="w-64 bg-slate-800 p-4 flex flex-col justify-between border-r border-slate-700">
+                <aside className="w-64 bg-slate-800 p-4 flex flex-col justify-between border-r border-slate-700 no-print">
                     <div>
                         <div className="flex items-center mb-8 px-2">
                             <Icon path={ICONS.CHART} className="h-8 w-8 text-sky-400" />
@@ -719,15 +728,19 @@
             if (!client) return <div className="text-center p-8 text-slate-400">Cliente não encontrado.</div>;
             
             if (presentationMode) {
-                return <PresentationView 
-                    client={client}
-                    profile={profile}
-                    user={user}
-                    analysis={portfolioAnalysis}
-                    redemptions={redemptions}
-                    applications={applications}
-                    onClose={() => setPresentationMode(false)}
-                />;
+                return ReactDOM.createPortal(
+                    <PresentationView 
+                        client={client}
+                        profile={profile}
+                        user={user}
+                        analysis={portfolioAnalysis}
+                        redemptions={redemptions}
+                        applications={applications}
+                        quotations={quotations}
+                        onClose={() => setPresentationMode(false)}
+                    />,
+                    document.body
+                );
             }
 
             return (
@@ -2137,10 +2150,9 @@
         }
         
         // --- PresentationView Component ---
-        function PresentationView({ client, profile, user, analysis, redemptions, applications, onClose }) {
+        function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
-            // Added IssuerConcentrationSlide
             const slides = [
                 <TitleSlide key="title" client={client} user={user} />,
                 <ConsolidatedPositionSlide key="consolidated" analysis={analysis} profile={profile} />,
@@ -2149,12 +2161,15 @@
                 <RebalancePlanSlide key="rebalance" redemptions={redemptions} applications={applications} />,
             ];
 
+            if (Object.keys(redemptions).length > 0) {
+                slides.push(<QuotationSlide key="quotation" redemptions={redemptions} quotations={quotations} />);
+            }
+
             const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slides.length - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
             const handlePrint = () => window.print();
 
             return (
-                // UPDATED: Added overflow-y-auto to the main content area for scrolling
                 <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col presentation-container">
                     <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
                         <h2 className="font-bold text-white">Modo Apresentação</h2>
@@ -2511,9 +2526,70 @@
             );
         };
         
+        const QuotationSlide = ({ redemptions, quotations }) => {
+            const totals = useMemo(() => {
+                let totalTela = 0, totalResgate = 0;
+                Object.values(redemptions).forEach(({asset}) => {
+                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                    totalTela += asset.Valor;
+                    totalResgate += (quotations[assetId] || 0);
+                });
+                const totalDesagio = totalTela - totalResgate;
+                const totalDesagioPercent = totalTela > 0 ? totalDesagio / totalTela : 0;
+                return { totalTela, totalResgate, totalDesagio, totalDesagioPercent };
+            }, [redemptions, quotations]);
+
+            return (
+                <div>
+                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Cotação para Resgate</h2>
+                    <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="border-b border-slate-700">
+                                <tr>
+                                    <th className="p-3 text-sm font-semibold text-slate-300">Ativo</th>
+                                    <th className="p-3 text-sm font-semibold text-slate-300 text-right">Valor de Tela</th>
+                                    <th className="p-3 text-sm font-semibold text-slate-300 text-right">Valor de Resgate</th>
+                                    <th className="p-3 text-sm font-semibold text-slate-300 text-right">Deságio (R$)</th>
+                                    <th className="p-3 text-sm font-semibold text-slate-300 text-right">Deságio (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Object.values(redemptions).map(({ asset }, index) => {
+                                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                                    const valorTela = asset.Valor;
+                                    const valorResgate = quotations[assetId] || 0;
+                                    const desagioValor = valorTela - valorResgate;
+                                    const desagioPercent = valorTela > 0 ? (desagioValor / valorTela) : 0;
+                                    return (
+                                        <tr key={assetId} className="border-b border-slate-700 last:border-b-0 text-sm">
+                                            <td className="p-3 font-medium text-white">{asset.Nome}<p className="text-xs text-slate-400">{asset.Instituição}</p></td>
+                                            <td className="p-3 text-slate-300 text-right">{formatCurrency(valorTela)}</td>
+                                            <td className="p-3 text-slate-300 text-right">{formatCurrency(valorResgate)}</td>
+                                            <td className="p-3 text-red-400 text-right">{formatCurrency(desagioValor)}</td>
+                                            <td className="p-3 text-red-400 text-right">{formatPercent(desagioPercent)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            <tfoot className="border-t-2 border-slate-600 bg-slate-900/50">
+                                <tr className="font-bold text-base">
+                                    <td className="p-3 text-white">TOTAIS</td>
+                                    <td className="p-3 text-slate-200 text-right">{formatCurrency(totals.totalTela)}</td>
+                                    <td className="p-3 text-slate-200 text-right">{formatCurrency(totals.totalResgate)}</td>
+                                    <td className="p-3 text-red-300 text-right">{formatCurrency(totals.totalDesagio)}</td>
+                                    <td className="p-3 text-red-300 text-right">{formatPercent(totals.totalDesagioPercent)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
 
     </script>
 </body>
 </html>
+
