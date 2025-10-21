@@ -48,51 +48,61 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b; /* slate-500 */
         }
-        /* Print styles for Presentation Mode */
+        /* NEW AND IMPROVED PRINT STYLES */
         @media print {
-            body {
+            body, html {
                 background-color: #fff !important;
-                 -webkit-print-color-adjust: exact !important;
+                -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                height: auto !important;
+                overflow: visible !important;
+                font-size: 10px; /* Adjust base font size for print */
             }
             .presentation-container {
                 display: block !important;
                 position: static !important;
                 width: 100% !important;
-                height: 100% !important;
+                height: auto !important;
                 overflow: visible !important;
                 background: #fff !important;
+                padding: 0 !important;
             }
             .presentation-slide {
                 width: 100% !important;
-                height: 100vh !important; /* Ensure each slide takes a full page */
-                page-break-after: always;
+                height: auto !important;
+                min-height: 98vh; /* Ensure it tries to fill a page */
+                page-break-after: always !important;
                 display: flex !important;
+                flex-direction: column !important;
                 visibility: visible !important;
                 opacity: 1 !important;
                 position: relative !important;
                 transform: none !important;
-                border: none !important;
+                border: 1px solid #e2e8f0 !important; /* slate-200 */
                 background: #fff !important;
-                color: #1e293b !important;
+                color: #0f172a !important; /* slate-900 */
+                overflow: visible !important;
             }
-             .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
-                color: #1e293b !important;
+            .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
+                color: #0f172a !important;
             }
              .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
-                background-color: #f8fafc !important; /* slate-50 for backgrounds */
+                background-color: #f1f5f9 !important; /* slate-100 for backgrounds */
+                border-color: #cbd5e1 !important; /* slate-300 */
             }
             .presentation-slide .border-slate-700 {
                 border-color: #cbd5e1 !important; /* slate-300 */
             }
-             .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300 {
-                 color: #1e293b !important; /* slate-800 */
-             }
+            .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
+                color: #1e293b !important; /* slate-800 */
+            }
             .presentation-slide .text-sky-400 { color: #38bdf8 !important; }
             .presentation-slide .text-green-400 { color: #4ade80 !important; }
             .presentation-slide .text-red-400 { color: #f87171 !important; }
-            .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; }
-
+            .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
+            .presentation-slide table, .presentation-slide th, .presentation-slide td {
+                 page-break-inside: avoid !important;
+            }
             .no-print {
                 display: none !important;
             }
@@ -217,9 +227,9 @@
              useEffect(() => {
                   let unsubscribeUserDoc = () => {};
                   const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
-                       unsubscribeUserDoc();
+                        unsubscribeUserDoc();
 
-                       if (currentUser) {
+                        if (currentUser) {
                             const userDocRef = db.collection("users").doc(currentUser.uid);
                             unsubscribeUserDoc = userDocRef.onSnapshot(async (doc) => {
                                 if (doc.exists) {
@@ -248,16 +258,16 @@
                                  setUserData(null);
                                  setLoading(false);
                             });
-                       } else {
+                        } else {
                             setUser(null);
                             setUserData(null);
                             setLoading(false);
-                       }
+                        }
                   });
 
                   return () => {
-                       unsubscribeAuth();
-                       unsubscribeUserDoc();
+                        unsubscribeAuth();
+                        unsubscribeUserDoc();
                   };
              }, []);
             
@@ -277,16 +287,16 @@
             
             if (user && !userData) {
                  return (
-                         <div className="h-screen w-full flex flex-col items-center justify-center text-center p-8 bg-slate-900 text-white">
-                             <h1 className="text-2xl text-red-400 font-bold mb-4">Erro de Perfil</h1>
-                             <p className="text-slate-400 mb-6 max-w-md">Não foi possível carregar ou criar os dados do seu perfil. Verifique as regras de segurança do Firebase e tente novamente.</p>
-                             <button 
-                                 onClick={handleSignOut} 
-                                 className="px-6 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition-colors"
-                             >
-                                 Sair
-                             </button>
-                         </div>
+                       <div className="h-screen w-full flex flex-col items-center justify-center text-center p-8 bg-slate-900 text-white">
+                            <h1 className="text-2xl text-red-400 font-bold mb-4">Erro de Perfil</h1>
+                            <p className="text-slate-400 mb-6 max-w-md">Não foi possível carregar ou criar os dados do seu perfil. Verifique as regras de segurança do Firebase e tente novamente.</p>
+                            <button 
+                                onClick={handleSignOut} 
+                                className="px-6 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition-colors"
+                            >
+                                Sair
+                            </button>
+                       </div>
                  );
             }
             
@@ -624,6 +634,7 @@
             
             const [redemptions, setRedemptions] = useState({});
             const [applications, setApplications] = useState({});
+            const [quotations, setQuotations] = useState({}); // New state for quotations
             
             useEffect(() => {
                 if(!clientId) return;
@@ -693,7 +704,15 @@
                     currentAllocationByClass[key].percentage = totalValue > 0 ? currentAllocationByClass[key].value / totalValue : 0;
                 });
                 
-                return { totalValue, institutions, currentAllocationByClass, portfolio };
+                // NEW: Issuer concentration
+                const issuerConcentration = portfolio.reduce((acc, asset) => {
+                    const key = asset.Emissor || 'Não Especificado';
+                    if(!acc[key]) acc[key] = 0;
+                    acc[key] += asset.Valor;
+                    return acc;
+                }, {});
+
+                return { totalValue, institutions, currentAllocationByClass, portfolio, issuerConcentration };
             }, [portfolio]);
 
             if (loading) return <div className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></div>;
@@ -726,20 +745,23 @@
                     </div>
 
                     <div className="flex justify-between items-center border-b border-slate-700">
-                        <nav className="flex space-x-6">
-                            <TabButton name="Posição Consolidada" id="consolidada" activeTab={activeTab} setActiveTab={setActiveTab} />
-                            <TabButton name="Comparativo de Alocação" id="comparativo" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis}/>
-                            <TabButton name="Resgate e Aplicação" id="rebalanceamento" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis} />
+                        <nav className="flex space-x-1 sm:space-x-6">
+                            <TabButton name="Consolidada" id="consolidada" activeTab={activeTab} setActiveTab={setActiveTab} />
+                            <TabButton name="Comparativo" id="comparativo" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis}/>
+                            <TabButton name="Emissores" id="emissores" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis} />
+                            <TabButton name="Rebalanceamento" id="rebalanceamento" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis} />
+                            <TabButton name="Cotação" id="cotacao" activeTab={activeTab} setActiveTab={setActiveTab} disabled={Object.keys(redemptions).length === 0} />
                         </nav>
                         <button onClick={() => setPresentationMode(true)} disabled={!portfolioAnalysis} className="flex items-center bg-teal-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors disabled:bg-teal-800 disabled:cursor-not-allowed">
                            <Icon path={ICONS.CHART} className="h-5 w-5 mr-2" />
-                            Gerar Apresentação
+                            Apresentação
                         </button>
                     </div>
 
                     <div>
                         <div style={{ display: activeTab === 'consolidada' ? 'block' : 'none' }}><ConsolidatedView analysis={portfolioAnalysis} /></div>
                         <div style={{ display: activeTab === 'comparativo' ? 'block' : 'none' }}><ComparisonView analysis={portfolioAnalysis} profile={profile} /></div>
+                        <div style={{ display: activeTab === 'emissores' ? 'block' : 'none' }}><IssuerView analysis={portfolioAnalysis} /></div>
                         <div style={{ display: activeTab === 'rebalanceamento' ? 'block' : 'none' }}>
                             <RebalanceWorkspace 
                                 analysis={portfolioAnalysis} 
@@ -749,6 +771,13 @@
                                 applications={applications}
                                 setApplications={setApplications}
                                 recommendedAssets={recommendedAssets}
+                            />
+                        </div>
+                        <div style={{ display: activeTab === 'cotacao' ? 'block' : 'none' }}>
+                            <QuotationView
+                                redemptions={redemptions}
+                                quotations={quotations}
+                                setQuotations={setQuotations}
                             />
                         </div>
                     </div>
@@ -780,7 +809,7 @@
 
                 const classes = ['Renda Fixa Pós', 'Renda Fixa Pré', 'Renda Fixa IPCA', 'Renda Variável', 'Multimercado', 'Fundos Listados', 'Exterior'];
                 
-                 const ws_listas_data = [
+                const ws_listas_data = [
                     ["Instituição", "Classes", null, "Renda_Fixa_Pós", "Renda_Fixa_Pré", "Renda_Fixa_IPCA", "Renda_Variável", "Multimercado", "Fundos_Listados", "Exterior"],
                     [INSTITUICOES[0], classes[0], null, 'Soberano', 'Bancário', 'Inflação', 'Long Only', 'Macro', 'FII', 'Renda Variável'],
                     [INSTITUICOES[1], classes[1], null, 'Crédito Privado', null, null, 'Long Biased', 'Long & Short', 'FI Infra', 'Renda Fixa'],
@@ -804,21 +833,22 @@
                 if(!wb.Workbook.Sheets) wb.Workbook.Sheets = [];
                 wb.Workbook.Sheets.push({ Name: 'LISTAS', Hidden: 1 });
 
+                // UPDATED: Added "Emissor"
                 const ws_dados = XLSX.utils.aoa_to_sheet([
                     [], [],
-                    [null, "Instituição", "Número da Conta", "Nome", "Vencimento", "Taxa", "Liquidez", "Valor", "Classe", "Subclasse"]
+                    [null, "Instituição", "Número da Conta", "Nome", "Emissor", "Vencimento", "Taxa", "Liquidez", "Valor", "Classe", "Subclasse"]
                 ]);
 
                 const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "0284C7" } } };
-                ['B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3', 'I3', 'J3'].forEach(c => {
+                ['B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3', 'I3', 'J3', 'K3'].forEach(c => {
                     if(ws_dados[c]) ws_dados[c].s = headerStyle;
                 });
                 
                 for (let i = 4; i <= 103; i++) { 
                     ws_dados[`B${i}`] = { t:'s', v:'', dv: { type: "list", formula1: 'LISTAS!$A$2:$A$13' } };
-                    ws_dados[`E${i}`] = { t:'n', z: 'dd/mm/yyyy' };
-                    ws_dados[`I${i}`] = { t:'s', v:'', dv: { type: "list", formula1: 'LISTAS!$B$2:$B$8' } };
-                    ws_dados[`J${i}`] = { t:'s', v:'', dv: { type: "list", formula1: `INDIRECT(SUBSTITUTE(I${i}," ","_"))` } };
+                    ws_dados[`F${i}`] = { t:'n', z: 'dd/mm/yyyy' };
+                    ws_dados[`J${i}`] = { t:'s', v:'', dv: { type: "list", formula1: 'LISTAS!$B$2:$B$8' } };
+                    ws_dados[`K${i}`] = { t:'s', v:'', dv: { type: "list", formula1: `INDIRECT(SUBSTITUTE(J${i}," ","_"))` } };
                 }
 
                 if(!wb.Workbook.Names) wb.Workbook.Names = [];
@@ -830,7 +860,8 @@
                 wb.Workbook.Names.push({ Name: "Fundos_Listados", Ref: "'LISTAS'!$I$2:$I$4" });
                 wb.Workbook.Names.push({ Name: "Exterior", Ref: "'LISTAS'!$J$2:$J$3" });
                 
-                ws_dados['!cols'] = [ {wch: 2}, {wch: 20}, {wch: 20}, {wch: 35}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 20}, {wch: 20}];
+                // UPDATED: Added column width for "Emissor"
+                ws_dados['!cols'] = [ {wch: 2}, {wch: 20}, {wch: 20}, {wch: 35}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 20}, {wch: 20}];
                 XLSX.utils.book_append_sheet(wb, ws_dados, "DADOS");
 
                 XLSX.writeFile(wb, "Planilha_Modelo_Highpar.xlsx");
@@ -854,10 +885,12 @@
                         vencimentoValue = vcto.toString();
                     }
 
+                    // UPDATED: Added "Emissor" field
                     return {
                         "Instituição": row.Instituição || '', 
                         "Número da Conta": row["Número da Conta"] || '',
                         "Nome": row.Nome || '', 
+                        "Emissor": row.Emissor || '',
                         "Vencimento": vencimentoValue,
                         "Taxa": row.Taxa || '', 
                         "Liquidez": row.Liquidez || '', 
@@ -898,9 +931,9 @@
                         setUploading(false);
                       });
                     }).catch((urlError) => {
-                        console.error("Erro ao obter a URL de download:", urlError);
-                        setError("Ocorreu um erro ao finalizar o upload.");
-                        setUploading(false);
+                         console.error("Erro ao obter a URL de download:", urlError);
+                         setError("Ocorreu um erro ao finalizar o upload.");
+                         setUploading(false);
                     });
                   }
                 );
@@ -1043,6 +1076,7 @@
                <thead className="border-b border-slate-700">
                     <tr>
                         <th className="p-4 text-sm font-semibold text-slate-300">Nome do Ativo</th>
+                        <th className="p-4 text-sm font-semibold text-slate-300">Emissor</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Classe / Subclasse</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Vencimento</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Taxa</th>
@@ -1053,12 +1087,13 @@
                     {portfolio.length > 0 ? portfolio.map((asset, index) => (
                         <tr key={index} className="border-b border-slate-700 last:border-b-0 hover:bg-slate-700/50">
                             <td className="p-4 font-medium text-white">{asset.Nome}</td>
+                            <td className="p-4 text-slate-300">{asset.Emissor || 'N/A'}</td>
                             <td className="p-4 text-slate-300">{asset.Classe}{asset.Subclasse ? ` - ${asset.Subclasse}` : ''}</td>
                             <td className="p-4 text-slate-300">{formatDisplayDate(asset.Vencimento)}</td>
                             <td className="p-4 text-slate-300">{asset.Taxa || 'N/A'}</td>
                             <td className="p-4 text-slate-300 text-right font-semibold">{formatCurrency(asset.Valor)}</td>
                         </tr>
-                    )) : <tr><td colSpan="5" className="p-8 text-center text-slate-400">Nenhum ativo para esta conta.</td></tr>}
+                    )) : <tr><td colSpan="6" className="p-8 text-center text-slate-400">Nenhum ativo para esta conta.</td></tr>}
                 </tbody>
             </table>
         );
@@ -1104,7 +1139,7 @@
         };
         
         const SvgPieChart = ({ data, title }) => {
-            const COLORS = ['#0ea5e9', '#14b8a6', '#8b5cf6', '#f97316', '#ec4899', '#facc15', '#64748b'];
+            const COLORS = ['#0ea5e9', '#14b8a6', '#8b5cf6', '#f97316', '#ec4899', '#facc15', '#64748b', '#ef4444', '#22c55e', '#a855f7'];
             const total = data.reduce((sum, item) => sum + item.value, 0);
             if (total === 0) return null;
 
@@ -1165,7 +1200,7 @@
         };
 
         const CssBarChart = ({ data, title }) => {
-            const COLORS = ['#0ea5e9', '#14b8a6', '#8b5cf6', '#f97316', '#ec4899', '#facc15', '#64748b'];
+            const COLORS = ['#0ea5e9', '#14b8a6', '#8b5cf6', '#f97316', '#ec4899', '#facc15', '#64748b', '#ef4444', '#22c55e', '#a855f7'];
             if (!data || data.length === 0) return null;
             const maxValue = Math.max(...data.map(item => item.value));
             if (maxValue === 0) return null;
@@ -1536,7 +1571,7 @@
                                                  <p className="text-sm font-semibold">{app.name}</p>
                                                  <p className="text-xs text-slate-300">{formatCurrency(app.value)}</p>
                                              </div>
-                                             <button onClick={() => onDeleteApplication(institution, index)} className="text-red-400 hover:text-red-300"><Icon path={ICONS.TRASH} className="h-4 w-4" /></button>
+                                             <button onClick={() => handleDeleteApplication(institution, index)} className="text-red-400 hover:text-red-300"><Icon path={ICONS.TRASH} className="h-4 w-4" /></button>
                                          </div>
                                      ))}
                                      <AddApplicationForm 
@@ -1668,11 +1703,11 @@
             return(
                 <div>
                      <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-3xl font-bold text-white">Configurações</h1>
+                         <h1 className="text-3xl font-bold text-white">Configurações</h1>
                      </div>
                      <div className="flex border-b border-slate-700 mb-6">
-                        <TabButton name="Perfis de Investidor" id="profiles" activeTab={activeTab} setActiveTab={setActiveTab} />
-                        <TabButton name="Ativos Recomendados" id="assets" activeTab={activeTab} setActiveTab={setActiveTab} />
+                         <TabButton name="Perfis de Investidor" id="profiles" activeTab={activeTab} setActiveTab={setActiveTab} />
+                         <TabButton name="Ativos Recomendados" id="assets" activeTab={activeTab} setActiveTab={setActiveTab} />
                      </div>
                      {activeTab === 'profiles' && <ProfilesSettings />}
                      {activeTab === 'assets' && <RecommendedAssetsSettings />}
@@ -1833,8 +1868,8 @@
             const removeSubcategory = (classId, subIndex) => {
                 const newAllocations = allocations.map(alloc => {
                     if (alloc.id === classId) {
-                       const newSubcategories = alloc.subcategories.filter((_, i) => i !== subIndex);
-                       return {...alloc, subcategories: newSubcategories};
+                      const newSubcategories = alloc.subcategories.filter((_, i) => i !== subIndex);
+                      return {...alloc, subcategories: newSubcategories};
                     }
                     return alloc;
                 });
@@ -1975,56 +2010,56 @@
             };
             
              return (
-                <div>
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-slate-300">Gerenciar Ativos Recomendados</h2>
-                        <button onClick={openNewModal} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
-                            <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
-                            Novo Ativo
-                        </button>
-                    </div>
+                 <div>
+                     <div className="flex justify-between items-center mb-6">
+                         <h2 className="text-2xl font-bold text-slate-300">Gerenciar Ativos Recomendados</h2>
+                         <button onClick={openNewModal} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
+                             <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
+                             Novo Ativo
+                         </button>
+                     </div>
 
-                    <div className="bg-slate-800 rounded-xl shadow-lg">
-                        <table className="w-full text-left">
-                            <thead className="border-b border-slate-700">
-                                <tr>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Nome do Ativo</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Classe</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Subclasse</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Corretoras</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr><td colSpan="5" className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></td></tr>
-                                ) : assets.length > 0 ? assets.map(asset => (
-                                    <tr key={asset.id} className="border-b border-slate-700 last:border-b-0 hover:bg-slate-700/50">
-                                        <td className="p-4 font-medium text-white">{asset.name}</td>
-                                        <td className="p-4 text-slate-300">{asset.class}</td>
-                                        <td className="p-4 text-slate-300">{asset.subclass || 'N/A'}</td>
-                                        <td className="p-4 text-slate-300 text-xs">{(asset.institutions || []).join(', ')}</td>
-                                        <td className="p-4 flex justify-end items-center space-x-4">
-                                            <button onClick={() => openEditModal(asset)} className="text-slate-400 hover:text-white"><Icon path={ICONS.EDIT} className="h-5 w-5"/></button>
-                                            <button onClick={() => openDeleteConfirmation(asset)} className="text-slate-400 hover:text-red-400"><Icon path={ICONS.TRASH} className="h-5 w-5"/></button>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr><td colSpan="5" className="text-center p-8 text-slate-400">Nenhum ativo recomendado encontrado.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    {isModalOpen && <RecommendedAssetModal asset={editingAsset} onClose={() => setIsModalOpen(false)} />}
-                    {confirmingDelete && (
-                        <ConfirmModal
-                            title="Confirmar Exclusão"
-                            message={`Tem certeza que deseja excluir o ativo "${confirmingDelete.name}"?`}
-                            onConfirm={handleConfirmDelete}
-                            onCancel={() => setConfirmingDelete(null)}
-                        />
-                    )}
-                </div>
+                     <div className="bg-slate-800 rounded-xl shadow-lg">
+                         <table className="w-full text-left">
+                             <thead className="border-b border-slate-700">
+                                 <tr>
+                                     <th className="p-4 text-sm font-semibold text-slate-300">Nome do Ativo</th>
+                                     <th className="p-4 text-sm font-semibold text-slate-300">Classe</th>
+                                     <th className="p-4 text-sm font-semibold text-slate-300">Subclasse</th>
+                                     <th className="p-4 text-sm font-semibold text-slate-300">Corretoras</th>
+                                     <th className="p-4 text-sm font-semibold text-slate-300 text-right">Ações</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {loading ? (
+                                     <tr><td colSpan="5" className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></td></tr>
+                                 ) : assets.length > 0 ? assets.map(asset => (
+                                     <tr key={asset.id} className="border-b border-slate-700 last:border-b-0 hover:bg-slate-700/50">
+                                         <td className="p-4 font-medium text-white">{asset.name}</td>
+                                         <td className="p-4 text-slate-300">{asset.class}</td>
+                                         <td className="p-4 text-slate-300">{asset.subclass || 'N/A'}</td>
+                                         <td className="p-4 text-slate-300 text-xs">{(asset.institutions || []).join(', ')}</td>
+                                         <td className="p-4 flex justify-end items-center space-x-4">
+                                             <button onClick={() => openEditModal(asset)} className="text-slate-400 hover:text-white"><Icon path={ICONS.EDIT} className="h-5 w-5"/></button>
+                                             <button onClick={() => openDeleteConfirmation(asset)} className="text-slate-400 hover:text-red-400"><Icon path={ICONS.TRASH} className="h-5 w-5"/></button>
+                                         </td>
+                                     </tr>
+                                 )) : (
+                                     <tr><td colSpan="5" className="text-center p-8 text-slate-400">Nenhum ativo recomendado encontrado.</td></tr>
+                                 )}
+                             </tbody>
+                         </table>
+                     </div>
+                     {isModalOpen && <RecommendedAssetModal asset={editingAsset} onClose={() => setIsModalOpen(false)} />}
+                     {confirmingDelete && (
+                         <ConfirmModal
+                             title="Confirmar Exclusão"
+                             message={`Tem certeza que deseja excluir o ativo "${confirmingDelete.name}"?`}
+                             onConfirm={handleConfirmDelete}
+                             onCancel={() => setConfirmingDelete(null)}
+                         />
+                     )}
+                 </div>
             );
         }
 
@@ -2067,26 +2102,26 @@
                      <div className="bg-slate-800 rounded-xl shadow-2xl p-8 w-full max-w-lg">
                          <h2 className="text-2xl font-bold text-white mb-6">{asset ? 'Editar Ativo' : 'Novo Ativo Recomendado'}</h2>
                          <form onSubmit={handleSubmit} className="space-y-4">
-                            <input type="text" placeholder="Nome do Ativo" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
-                            <input type="text" placeholder="Classe" value={assetClass} onChange={e => setAssetClass(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
-                            <input type="text" placeholder="Subclasse (opcional)" value={subclass} onChange={e => setSubclass(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" />
-                            
-                            <div>
-                                <label className="text-sm font-semibold text-slate-300 mb-2 block">Corretoras Disponíveis</label>
-                                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-700/50 rounded-lg">
-                                    {INSTITUICOES.map(inst => (
-                                        <label key={inst} className="flex items-center space-x-2 text-sm cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={institutions.includes(inst)}
-                                                onChange={() => handleInstitutionToggle(inst)}
-                                                className="form-checkbox h-4 w-4 rounded bg-slate-600 border-slate-500 text-sky-500 focus:ring-sky-500"
-                                            />
-                                            <span>{inst}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
+                             <input type="text" placeholder="Nome do Ativo" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
+                             <input type="text" placeholder="Classe" value={assetClass} onChange={e => setAssetClass(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
+                             <input type="text" placeholder="Subclasse (opcional)" value={subclass} onChange={e => setSubclass(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" />
+                             
+                             <div>
+                                 <label className="text-sm font-semibold text-slate-300 mb-2 block">Corretoras Disponíveis</label>
+                                 <div className="grid grid-cols-3 gap-2 p-3 bg-slate-700/50 rounded-lg">
+                                     {INSTITUICOES.map(inst => (
+                                         <label key={inst} className="flex items-center space-x-2 text-sm cursor-pointer">
+                                             <input 
+                                                 type="checkbox" 
+                                                 checked={institutions.includes(inst)}
+                                                 onChange={() => handleInstitutionToggle(inst)}
+                                                 className="form-checkbox h-4 w-4 rounded bg-slate-600 border-slate-500 text-sky-500 focus:ring-sky-500"
+                                             />
+                                             <span>{inst}</span>
+                                         </label>
+                                     ))}
+                                 </div>
+                             </div>
 
                              <div className="flex justify-end pt-4 space-x-3">
                                  <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-600 rounded-lg hover:bg-slate-500">Cancelar</button>
@@ -2105,10 +2140,12 @@
         function PresentationView({ client, profile, user, analysis, redemptions, applications, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
+            // Added IssuerConcentrationSlide
             const slides = [
                 <TitleSlide key="title" client={client} user={user} />,
                 <ConsolidatedPositionSlide key="consolidated" analysis={analysis} profile={profile} />,
                 <AllocationComparisonSlide key="comparison" analysis={analysis} profile={profile} />,
+                <IssuerConcentrationSlide key="issuer" analysis={analysis} />,
                 <RebalancePlanSlide key="rebalance" redemptions={redemptions} applications={applications} />,
             ];
 
@@ -2117,8 +2154,9 @@
             const handlePrint = () => window.print();
 
             return (
+                // UPDATED: Added overflow-y-auto to the main content area for scrolling
                 <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col presentation-container">
-                    <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700">
+                    <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
                         <h2 className="font-bold text-white">Modo Apresentação</h2>
                         <div className="flex items-center space-x-4">
                             <span className="text-sm text-slate-400">Slide {currentSlide + 1} de {slides.length}</span>
@@ -2130,15 +2168,14 @@
                             <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
                         </div>
                     </header>
-                    <main className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+                    <main className="flex-1 p-4 overflow-y-auto">
                         <div className="w-full h-full relative">
                            {slides.map((slide, index) => (
                                 <div
                                     key={index}
-                                    className={`presentation-slide absolute top-0 left-0 w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg transition-all duration-300 ease-in-out flex flex-col justify-center ${
-                                        index === currentSlide ? 'opacity-100 visible' : 'opacity-0 invisible'
+                                    className={`presentation-slide absolute top-0 left-0 w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg transition-opacity duration-300 ease-in-out flex flex-col justify-center ${
+                                        index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible'
                                     }`}
-                                    style={{ transform: `translateX(${(index - currentSlide) * 100}%)` }}
                                 >
                                     {slide}
                                 </div>
@@ -2167,14 +2204,14 @@
                  if (!analysis || !profile || !profile.allocations) return null;
                  const { totalValue } = analysis;
                  const data = profile.allocations.reduce((acc, alloc) => {
-                    const key = alloc.Classe;
-                    const value = (alloc.percentage / 100) * totalValue;
-                    if(!acc[key]) {
-                        acc[key] = { name: key, value: 0};
-                    }
-                    acc[key].value += value;
-                    return acc;
-                }, {});
+                     const key = alloc.Classe;
+                     const value = (alloc.percentage / 100) * totalValue;
+                     if(!acc[key]) {
+                         acc[key] = { name: key, value: 0};
+                     }
+                     acc[key].value += value;
+                     return acc;
+                 }, {});
                 return Object.values(data).filter(d => d.value > 0);
             }, [analysis, profile]);
 
@@ -2334,16 +2371,16 @@
                             <h3 className="text-xl font-semibold text-green-400 mb-4">Aplicações Sugeridas</h3>
                              <div className="space-y-3 max-h-96 overflow-y-auto">
                                {Object.values(applications).flat().length > 0 ? Object.entries(applications).map(([inst, apps]) => (
-                                    <div key={inst}>
-                                      <h4 className="font-bold text-slate-300 text-sm mb-1">{inst}</h4>
-                                      {apps.map((app, i) => (
+                                   <div key={inst}>
+                                     <h4 className="font-bold text-slate-300 text-sm mb-1">{inst}</h4>
+                                     {apps.map((app, i) => (
                                          <div key={i} className="flex justify-between items-center text-sm p-2 bg-slate-700/50 rounded mb-2">
                                              <p className="font-semibold text-slate-200">{app.name}</p>
                                              <p className="font-bold text-green-400">{formatCurrency(app.value)}</p>
                                          </div>
-                                      ))}
-                                    </div>
-                                )) : <p className="text-slate-400 text-sm">Nenhuma aplicação necessária.</p>}
+                                     ))}
+                                   </div>
+                               )) : <p className="text-slate-400 text-sm">Nenhuma aplicação necessária.</p>}
                             </div>
                              <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold">
                                 <span>Total a Aplicar:</span>
@@ -2355,10 +2392,128 @@
             )
         };
         
+        // --- NEW COMPONENTS ---
+        function IssuerView({ analysis }) {
+            const issuerData = useMemo(() => {
+                if (!analysis || !analysis.issuerConcentration) return null;
+                const sorted = Object.entries(analysis.issuerConcentration)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+                return {
+                    chartData: sorted,
+                    totalValue: analysis.totalValue
+                };
+            }, [analysis]);
+
+            if (!issuerData) {
+                return <div className="text-center p-10 bg-slate-800 rounded-lg"><h3 className="text-lg text-slate-400">Nenhum emissor identificado no portfólio.</h3></div>;
+            }
+
+            return (
+                <div className="space-y-6">
+                    <CssBarChart data={issuerData.chartData} title="Concentração por Emissor" />
+                </div>
+            )
+        }
+        
+        function QuotationView({ redemptions, quotations, setQuotations }) {
+            const handleQuoteChange = (assetId, value) => {
+                const numericValue = parseFloat(String(value).replace(/\D/g, '')) / 100;
+                setQuotations(prev => ({
+                    ...prev,
+                    [assetId]: isNaN(numericValue) ? 0 : numericValue
+                }));
+            };
+
+            const redemptionList = Object.values(redemptions).map(r => r.asset);
+            const totals = useMemo(() => {
+                let totalTela = 0, totalResgate = 0;
+                Object.values(redemptions).forEach(({asset}) => {
+                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                     totalTela += asset.Valor;
+                     totalResgate += (quotations[assetId] || 0);
+                });
+                const totalDesagio = totalTela - totalResgate;
+                const totalDesagioPercent = totalTela > 0 ? totalDesagio / totalTela : 0;
+                return { totalTela, totalResgate, totalDesagio, totalDesagioPercent };
+            }, [redemptions, quotations]);
+
+            return (
+                <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
+                    <h3 className="text-xl font-semibold text-white p-4">Cotação de Ativos para Resgate</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="border-b border-slate-700">
+                                <tr>
+                                    <th className="p-4 text-sm font-semibold text-slate-300">Ativo</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-300">Valor de Tela</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-300">Valor de Resgate</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-300">Deságio (R$)</th>
+                                    <th className="p-4 text-sm font-semibold text-slate-300">Deságio (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Object.values(redemptions).map(({ asset }, index) => {
+                                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                                    const valorTela = asset.Valor;
+                                    const valorResgate = quotations[assetId] || 0;
+                                    const desagioValor = valorTela - valorResgate;
+                                    const desagioPercent = valorTela > 0 ? (desagioValor / valorTela) : 0;
+                                    return (
+                                        <tr key={assetId} className="border-b border-slate-700 last:border-b-0">
+                                            <td className="p-4 font-medium text-white">{asset.Nome}<p className="text-xs text-slate-400">{asset.Instituição}</p></td>
+                                            <td className="p-4 text-slate-300">{formatCurrency(valorTela)}</td>
+                                            <td className="p-4">
+                                                <input 
+                                                    type="text"
+                                                    value={formatCurrency(valorResgate)}
+                                                    onChange={(e) => handleQuoteChange(assetId, e.target.value)}
+                                                    className="w-36 px-2 py-1 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                                                />
+                                            </td>
+                                            <td className="p-4 text-red-400">{formatCurrency(desagioValor)}</td>
+                                            <td className="p-4 text-red-400">{formatPercent(desagioPercent)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            <tfoot className="border-t-2 border-slate-600 bg-slate-900/50">
+                                <tr className="font-bold">
+                                    <td className="p-4 text-white">TOTAIS</td>
+                                    <td className="p-4 text-slate-200">{formatCurrency(totals.totalTela)}</td>
+                                    <td className="p-4 text-slate-200">{formatCurrency(totals.totalResgate)}</td>
+                                    <td className="p-4 text-red-300">{formatCurrency(totals.totalDesagio)}</td>
+                                    <td className="p-4 text-red-300">{formatPercent(totals.totalDesagioPercent)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+        
+        const IssuerConcentrationSlide = ({ analysis }) => {
+            const issuerData = useMemo(() => {
+                if (!analysis || !analysis.issuerConcentration) return null;
+                const sorted = Object.entries(analysis.issuerConcentration)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+                return sorted;
+            }, [analysis]);
+
+            return (
+                <div>
+                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Concentração por Emissor</h2>
+                    {!issuerData ? <p className="text-slate-400">Dados de emissor não disponíveis.</p> : (
+                         <CssBarChart data={issuerData} title="" />
+                    )}
+                </div>
+            );
+        };
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
 
     </script>
 </body>
 </html>
-
