@@ -69,8 +69,7 @@
             }
             .presentation-slide {
                 width: 100% !important;
-                height: auto !important;
-                min-height: 98vh; /* Ensure it tries to fill a page */
+                height: 100vh !important;
                 page-break-after: always !important;
                 display: flex !important;
                 flex-direction: column !important;
@@ -81,12 +80,13 @@
                 border: 1px solid #e2e8f0 !important; /* slate-200 */
                 background: #fff !important;
                 color: #0f172a !important; /* slate-900 */
-                overflow: visible !important;
+                overflow: hidden !important; /* Hide overflow in print */
+                padding: 2.5rem !important;
             }
             .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
                 color: #0f172a !important;
             }
-             .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
+            .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
                 background-color: #f1f5f9 !important; /* slate-100 for backgrounds */
                 border-color: #cbd5e1 !important; /* slate-300 */
             }
@@ -96,25 +96,43 @@
             .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
                 color: #1e293b !important; /* slate-800 */
             }
-            .presentation-slide .text-sky-400 { color: #38bdf8 !important; }
-            .presentation-slide .text-green-400 { color: #4ade80 !important; }
-            .presentation-slide .text-red-400 { color: #f87171 !important; }
+            .presentation-slide .text-sky-400, .presentation-slide .text-sky-500 { color: #0ea5e9 !important; }
+            .presentation-slide .text-green-400 { color: #22c55e !important; }
+            .presentation-slide .text-red-400 { color: #ef4444 !important; }
+            .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
             .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
-            .presentation-slide table, .presentation-slide th, .presentation-slide td {
+            .presentation-slide table {
                  page-break-inside: avoid !important;
+            }
+            .slide-content-print {
+                flex-grow: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .slide-header-print {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #cbd5e1;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem; /* Reduced margin */
+                flex-shrink: 0;
+            }
+
+            .slide-footer-print {
+                text-align: center;
+                border-top: 1px solid #cbd5e1;
+                padding-top: 0.75rem;
+                margin-top: 1rem; /* Reduced margin */
+                font-size: 9px;
+                color: #475569;
+                flex-shrink: 0;
             }
             .no-print {
                 display: none !important;
             }
-            /* Hide main app root when printing presentation */
-            body > #root {
-                display: block;
-            }
-            @media print {
-                body > #root {
-                    display: none !important;
-                }
-            }
+            body > #root { display: none !important; }
         }
     </style>
 </head>
@@ -431,33 +449,119 @@
             );
         }
 
+        const calculateFrameworkStatus = (portfolio, profile) => {
+            if (!portfolio || portfolio.length === 0 || !profile || !profile.allocations) {
+                return { status: 'Aguardando Ativos', deviation: 100 };
+            }
+
+            const totalValue = portfolio.reduce((sum, asset) => sum + asset.Valor, 0);
+            if (totalValue === 0) return { status: 'Aguardando Ativos', deviation: 100 };
+
+            const currentAllocationByClass = portfolio.reduce((acc, asset) => {
+                const key = asset.Classe + (asset.Subclasse ? ` - ${asset.Subclasse}` : '');
+                if (!acc[key]) acc[key] = 0;
+                acc[key] += asset.Valor;
+                return acc;
+            }, {});
+
+            const recommendedAllocationMap = profile.allocations.reduce((acc, alloc) => {
+                if ((alloc.subcategories || []).length > 0) {
+                    alloc.subcategories.forEach(sub => {
+                        const key = alloc.Classe + (sub.name ? ` - ${sub.name}` : '');
+                        acc[normalizeString(key)] = sub.percentage / 100;
+                    });
+                } else {
+                    const key = alloc.Classe;
+                    if(key) acc[normalizeString(key)] = alloc.percentage / 100;
+                }
+                return acc;
+            }, {});
+            
+            const currentAllocationMap = Object.entries(currentAllocationByClass).reduce((acc, [key, value]) => {
+                acc[normalizeString(key)] = value / totalValue;
+                return acc;
+            }, {});
+
+            const allKeys = [...new Set([...Object.keys(currentAllocationMap), ...Object.keys(recommendedAllocationMap)])];
+            
+            let totalDeviation = 0;
+            allKeys.forEach(key => {
+                const current = currentAllocationMap[key] || 0;
+                const recommended = recommendedAllocationMap[key] || 0;
+                totalDeviation += Math.abs(current - recommended);
+            });
+            
+            const deviationPercentage = (totalDeviation / 2) * 100;
+
+            if (deviationPercentage <= 5) return { status: 'Enquadrado', deviation: deviationPercentage };
+            if (deviationPercentage <= 20) return { status: 'Atenção', deviation: deviationPercentage };
+            return { status: 'Desenquadrado', deviation: deviationPercentage };
+        };
+
+        const StatusBadge = ({ status }) => {
+            const styleMap = {
+                'Enquadrado': 'bg-green-500/20 text-green-400',
+                'Atenção': 'bg-yellow-500/20 text-yellow-400',
+                'Desenquadrado': 'bg-red-500/20 text-red-400',
+                'Aguardando Ativos': 'bg-slate-600/50 text-slate-400'
+            };
+            return (
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styleMap[status] || styleMap['Aguardando Ativos']}`}>
+                    {status}
+                </span>
+            );
+        };
+
         function Dashboard({ user, setPage, setSelectedClientId }) {
             const [clients, setClients] = useState([]);
             const [loading, setLoading] = useState(true);
             const [modalState, setModalState] = useState({ open: false, client: null });
             const [deletingClient, setDeletingClient] = useState(null);
 
-
             useEffect(() => {
                 if (!user) {
                     setLoading(false);
                     return;
                 }
-                let query = db.collection('clients');
-                if (user.role !== 'admin') {
-                    query = query.where('consultantId', '==', user.uid);
-                }
-                const unsubscribe = query.onSnapshot((querySnapshot) => {
-                    const clientsData = [];
-                    querySnapshot.forEach((doc) => {
-                        clientsData.push({ id: doc.id, ...doc.data() });
-                    });
-                    setClients(clientsData);
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Error fetching clients:", error);
-                    setLoading(false);
+
+                const fetchDashboardData = async () => {
+                    setLoading(true);
+                    try {
+                        const profilesSnapshot = await db.collection('profiles').get();
+                        const profilesData = profilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                        let clientQuery = db.collection('clients');
+                        if (user.role !== 'admin') {
+                            clientQuery = clientQuery.where('consultantId', '==', user.uid);
+                        }
+
+                        const unsubscribeClients = clientQuery.onSnapshot(querySnapshot => {
+                            const clientsData = querySnapshot.docs.map(doc => {
+                                const client = { id: doc.id, ...doc.data() };
+                                const clientProfile = profilesData.find(p => p.id === client.profileId);
+                                const { status } = calculateFrameworkStatus(client.portfolioData, clientProfile);
+                                return { ...client, status };
+                            });
+                            setClients(clientsData);
+                            setLoading(false);
+                        }, (error) => {
+                            console.error("Error fetching clients:", error);
+                            setLoading(false);
+                        });
+
+                        return unsubscribeClients;
+                    } catch (error) {
+                        console.error("Error fetching initial dashboard data:", error);
+                        setLoading(false);
+                        return () => {};
+                    }
+                };
+                
+                let unsubscribe = () => {};
+                fetchDashboardData().then(unsub => {
+                    if (unsub) unsubscribe = unsub;
                 });
+
                 return () => unsubscribe();
             }, [user]);
 
@@ -501,15 +605,7 @@
                                             <td className="p-4 text-slate-300">{client.profileName || 'Não definido'}</td>
                                             {user?.role === 'admin' && <td className="p-4 text-slate-300">{client.consultantName}</td>}
                                             <td className="p-4">
-                                                 {client.portfolioData && client.portfolioData.length > 0 ? (
-                                                     <span className="px-2 py-1 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full">
-                                                         Analisar
-                                                     </span>
-                                                 ) : (
-                                                     <span className="px-2 py-1 text-xs font-semibold bg-slate-600/50 text-slate-400 rounded-full">
-                                                         Aguardando Ativos
-                                                     </span>
-                                                 )}
+                                                <StatusBadge status={client.status} />
                                             </td>
                                             <td className="p-4 flex justify-end items-center space-x-4">
                                                 <button onClick={() => viewClient(client.id)} className="text-sky-400 hover:text-sky-300 font-semibold">Visualizar</button>
@@ -1301,7 +1397,8 @@
                         recommendedPercent: recommended.percentage,
                         diffValue: current.value - recommended.value,
                     };
-                }).sort((a,b) => b.recommendedValue - a.recommendedValue);
+                }).sort((a,b) => b.recommendedValue - a.recommendedValue)
+                  .filter(item => item.recommendedPercent > 0 || item.currentPercent > 0);
                 
                 const institutionalData = analysis.portfolio.reduce((acc, asset) => {
                     const account = asset.Instituição + (asset["Número da Conta"] ? ` - ${asset["Número da Conta"]}` : '');
@@ -2381,35 +2478,56 @@
             )
         }
         
-        // --- PresentationView Component ---
+        // --- PresentationView Components ---
+        const SlideHeader = ({ title }) => (
+            <div className="slide-header-print">
+                <div className="flex items-center">
+                    <Icon path={ICONS.CHART} className="h-8 w-8 text-sky-500" />
+                    <span className="ml-2 text-xl font-bold">HIGHPAR</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-700">{title}</h2>
+            </div>
+        );
+
+        const SlideFooter = ({ clientName, slideNumber, totalSlides }) => (
+            <div className="slide-footer-print">
+                <span>{clientName} | Relatório de Enquadramento de Carteira | Página {slideNumber} de {totalSlides}</span>
+            </div>
+        );
+
         function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
-            const slides = [
-                <TitleSlide key="title" client={client} user={user} />,
-                <ConsolidatedPositionSlide key="consolidated" analysis={analysis} profile={profile} />,
-                <AllocationComparisonSlide key="comparison" analysis={analysis} profile={profile} />,
-                <IssuerConcentrationSlide key="issuer" analysis={analysis} />,
-                <RebalancePlanSlide key="rebalance" redemptions={redemptions} applications={applications} />,
+            const slideConfigs = [
+                { Component: TitleSlide, props: { client, user }, title: "Capa" },
+                { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
+                { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
+                { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
+                { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
             ];
 
             if (Object.keys(redemptions).length > 0) {
-                slides.push(<QuotationSlide key="quotation" redemptions={redemptions} quotations={quotations} />);
+                slideConfigs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
             }
 
-            const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slides.length - 1));
+            const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
-            const handlePrint = () => window.print();
+            const handlePrint = () => {
+                const root = document.getElementById('root');
+                root.style.display = 'none'; // Hide the main app
+                window.print();
+                root.style.display = 'flex'; // Show it again after print dialog
+            };
 
             return (
                 <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col presentation-container">
                     <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
                         <h2 className="font-bold text-white">Modo Apresentação</h2>
                         <div className="flex items-center space-x-4">
-                            <span className="text-sm text-slate-400">Slide {currentSlide + 1} de {slides.length}</span>
+                            <span className="text-sm text-slate-400">Slide {currentSlide + 1} de {slideConfigs.length}</span>
                             <div className="flex items-center space-x-2">
                                 <button onClick={prevSlide} disabled={currentSlide === 0} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_LEFT} className="h-5 w-5" /></button>
-                                <button onClick={nextSlide} disabled={currentSlide === slides.length - 1} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_RIGHT} className="h-5 w-5" /></button>
+                                <button onClick={nextSlide} disabled={currentSlide === slideConfigs.length - 1} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_RIGHT} className="h-5 w-5" /></button>
                             </div>
                             <button onClick={handlePrint} className="flex items-center bg-sky-600 px-3 py-2 text-sm rounded-lg hover:bg-sky-700"><Icon path={ICONS.PDF} className="h-5 w-5 mr-2"/> Gerar PDF</button>
                             <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
@@ -2417,16 +2535,23 @@
                     </header>
                     <main className="flex-1 p-4 overflow-y-auto">
                         <div className="w-full h-full relative">
-                           {slides.map((slide, index) => (
-                                <div
-                                    key={index}
-                                    className={`presentation-slide absolute top-0 left-0 w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg transition-opacity duration-300 ease-in-out flex flex-col justify-center ${
-                                        index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible'
-                                    }`}
-                                >
-                                    {slide}
-                                </div>
-                            ))}
+                           {slideConfigs.map(({ Component, props, title }, index) => {
+                               const slideInfo = { current: index + 1, total: slideConfigs.length };
+                               return (
+                                    <div
+                                        key={index}
+                                        className={`presentation-slide absolute top-0 left-0 w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg transition-opacity duration-300 ease-in-out flex flex-col justify-start ${
+                                            index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible'
+                                        }`}
+                                    >
+                                        {index > 0 && <SlideHeader title={title} />}
+                                        <div className="slide-content-print">
+                                            <Component {...props} />
+                                        </div>
+                                        {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideInfo.total} />}
+                                    </div>
+                               )
+                           })}
                         </div>
                     </main>
                 </div>
@@ -2474,8 +2599,7 @@
             }, [analysis]);
             
             return (
-                 <div>
-                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Posição Consolidada</h2>
+                 <React.Fragment>
                     {analysis ? (
                         <div className="flex flex-col h-full space-y-8">
                             <div className="grid grid-cols-2 gap-8 flex-grow">
@@ -2487,7 +2611,7 @@
                             </div>
                         </div>
                     ) : <p className="text-slate-400">Dados do portfólio não disponíveis.</p>}
-                </div>
+                </React.Fragment>
             );
         };
         
@@ -2543,13 +2667,14 @@
                         recommendedPercent: recommended.percentage,
                         diffValue: current.value - recommended.value,
                     };
-                }).sort((a,b) => (b.recommendedPercent*1000 + b.currentPercent) - (a.recommendedPercent*1000 + a.currentPercent));
+                }).sort((a,b) => (b.recommendedPercent*1000 + b.currentPercent) - (a.recommendedPercent*1000 + a.currentPercent))
+                .filter(item => item.recommendedPercent > 0 || item.currentPercent > 0);
             }, [analysis, profile]);
 
             return (
-                <div>
-                     <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Alocação Atual vs. Recomendada</h2>
+                <React.Fragment>
                     {!comparisonData ? <p className="text-slate-400">Dados insuficientes para comparação.</p> : (
+                        <div className="overflow-y-auto h-full">
                         <table className="w-full text-left">
                             <thead className="border-b border-slate-700">
                                 <tr>
@@ -2583,8 +2708,9 @@
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     )}
-                </div>
+                </React.Fragment>
             );
         };
 
@@ -2593,12 +2719,11 @@
             const totalApplied = Object.values(applications).flat().reduce((sum, app) => sum + app.value, 0);
 
             return (
-                 <div>
-                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Plano de Ação</h2>
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="bg-slate-800 p-6 rounded-xl">
+                 <React.Fragment>
+                    <div className="grid grid-cols-2 gap-8 h-full">
+                        <div className="bg-slate-800 p-6 rounded-xl flex flex-col">
                             <h3 className="text-xl font-semibold text-red-400 mb-4">Resgates Sugeridos</h3>
-                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                            <div className="space-y-3 flex-grow overflow-y-auto">
                                {Object.values(redemptions).length > 0 ? Object.values(redemptions).map(({ asset, amount }, i) => (
                                    <div key={i} className="flex justify-between items-center text-sm p-2 bg-slate-700/50 rounded">
                                        <div>
@@ -2609,14 +2734,14 @@
                                    </div>
                                )) : <p className="text-slate-400 text-sm">Nenhum resgate necessário.</p>}
                             </div>
-                            <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold">
+                            <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold flex-shrink-0">
                                 <span>Total a Resgatar:</span>
                                 <span>{formatCurrency(totalRedeemed)}</span>
                             </div>
                         </div>
-                         <div className="bg-slate-800 p-6 rounded-xl">
+                         <div className="bg-slate-800 p-6 rounded-xl flex flex-col">
                             <h3 className="text-xl font-semibold text-green-400 mb-4">Aplicações Sugeridas</h3>
-                             <div className="space-y-3 max-h-96 overflow-y-auto">
+                             <div className="space-y-3 flex-grow overflow-y-auto">
                                {Object.values(applications).flat().length > 0 ? Object.entries(applications).map(([inst, apps]) => (
                                    <div key={inst}>
                                      <h4 className="font-bold text-slate-300 text-sm mb-1">{inst}</h4>
@@ -2629,13 +2754,13 @@
                                    </div>
                                )) : <p className="text-slate-400 text-sm">Nenhuma aplicação necessária.</p>}
                             </div>
-                             <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold">
+                             <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold flex-shrink-0">
                                 <span>Total a Aplicar:</span>
                                 <span>{formatCurrency(totalApplied)}</span>
                             </div>
                         </div>
                     </div>
-                </div>
+                </React.Fragment>
             )
         };
         
@@ -2749,12 +2874,11 @@
             }, [analysis]);
 
             return (
-                <div>
-                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Concentração por Emissor</h2>
+                <React.Fragment>
                     {!issuerData ? <p className="text-slate-400">Dados de emissor não disponíveis.</p> : (
                          <CssBarChart data={issuerData} title="" />
                     )}
-                </div>
+                </React.Fragment>
             );
         };
         
@@ -2772,8 +2896,7 @@
             }, [redemptions, quotations]);
 
             return (
-                <div>
-                    <h2 className="text-3xl font-bold text-white mb-8 border-b border-slate-700 pb-4">Cotação para Resgate</h2>
+                <div className="h-full overflow-y-auto">
                     <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
                         <table className="w-full text-left">
                             <thead className="border-b border-slate-700">
@@ -2824,4 +2947,5 @@
     </script>
 </body>
 </html>
+
 
