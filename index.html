@@ -48,6 +48,12 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b; /* slate-500 */
         }
+        
+        /* Hides the print-only content from the screen */
+        .printable-content {
+            display: none;
+        }
+
         /* NEW AND IMPROVED PRINT STYLES */
         @media print {
             body, html {
@@ -58,14 +64,16 @@
                 overflow: visible !important;
                 font-size: 10px; /* Adjust base font size for print */
             }
-            .presentation-container {
+            /* Hide screen-only elements */
+            .no-print {
+                display: none !important;
+            }
+            body > #root { 
+                display: none !important; 
+            }
+            /* Show print-only content */
+            .printable-content {
                 display: block !important;
-                position: static !important;
-                width: 100% !important;
-                height: auto !important;
-                overflow: visible !important;
-                background: #fff !important;
-                padding: 0 !important;
             }
             .presentation-slide {
                 width: 100% !important;
@@ -87,7 +95,7 @@
                 color: #0f172a !important;
             }
             .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
-                background-color: #f1f5f9 !important; /* slate-100 for backgrounds */
+                background-color: #f8fafc !important; /* slate-50 for backgrounds */
                 border-color: #cbd5e1 !important; /* slate-300 */
             }
             .presentation-slide .border-slate-700 {
@@ -119,7 +127,6 @@
                 margin-bottom: 1rem; /* Reduced margin */
                 flex-shrink: 0;
             }
-
             .slide-footer-print {
                 text-align: center;
                 border-top: 1px solid #cbd5e1;
@@ -129,10 +136,6 @@
                 color: #475569;
                 flex-shrink: 0;
             }
-            .no-print {
-                display: none !important;
-            }
-            body > #root { display: none !important; }
         }
     </style>
 </head>
@@ -200,7 +203,6 @@
         
         const formatDisplayDate = (dateValue) => {
             if (!dateValue) return 'N/A';
-
             let date;
             
             if (dateValue && typeof dateValue.seconds === 'number') {
@@ -227,7 +229,6 @@
             if (date && !isNaN(date.getTime())) {
                 return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
             }
-
             return dateValue.toString();
         };
 
@@ -744,7 +745,7 @@
             
             const [redemptions, setRedemptions] = useState({});
             const [applications, setApplications] = useState({});
-            const [quotations, setQuotations] = useState({}); // New state for quotations
+            const [quotations, setQuotations] = useState({});
             
             useEffect(() => {
                 if(!clientId) return;
@@ -835,12 +836,20 @@
 
                 return { totalValue, institutions, currentAllocationByClass, portfolio, issuerConcentration, allocationByAssetType };
             }, [portfolio]);
+            
+            const totalAppliedPerClass = useMemo(() => {
+                return Object.values(applications).flat().reduce((acc, app) => {
+                    if (!acc[app.Classe]) acc[app.Classe] = 0;
+                    acc[app.Classe] += app.value;
+                    return acc;
+                }, {});
+            }, [applications]);
 
             if (loading) return <div className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></div>;
             if (!client) return <div className="text-center p-8 text-slate-400">Cliente não encontrado.</div>;
             
             if (presentationMode) {
-                return ReactDOM.createPortal(
+                const presentationComponent = (
                     <PresentationView 
                         client={client}
                         profile={profile}
@@ -850,9 +859,9 @@
                         applications={applications}
                         quotations={quotations}
                         onClose={() => setPresentationMode(false)}
-                    />,
-                    document.body
+                    />
                 );
+                return ReactDOM.createPortal(presentationComponent, document.body);
             }
 
             return (
@@ -896,6 +905,7 @@
                                 applications={applications}
                                 setApplications={setApplications}
                                 recommendedAssets={recommendedAssets}
+                                totalAppliedPerClass={totalAppliedPerClass}
                             />
                         </div>
                         <div style={{ display: activeTab === 'cotacao' ? 'block' : 'none' }}>
@@ -1389,7 +1399,6 @@
             );
         };
 
-
         function ComparisonView({ analysis, profile }) {
             const comparisonData = useMemo(() => {
                 if (!analysis || !profile || !profile.allocations) return null;
@@ -1536,7 +1545,7 @@
             );
         }
 
-        function RebalanceWorkspace({ analysis, profile, redemptions, setRedemptions, applications, setApplications, recommendedAssets }) {
+        function RebalanceWorkspace({ analysis, profile, redemptions, setRedemptions, applications, setApplications, recommendedAssets, totalAppliedPerClass }) {
 
             const movements = useMemo(() => {
                 if (!analysis || !profile || !profile.allocations) return null;
@@ -1641,13 +1650,14 @@
                             onAddApplication={handleAddApplication}
                             onDeleteApplication={handleDeleteApplication}
                             recommendedAssets={recommendedAssets}
+                            totalAppliedPerClass={totalAppliedPerClass}
                         />
                     ))}
                 </div>
             );
         }
 
-        function InstitutionRebalanceBlock({ institution, portfolio, movements, redemptions, onRedemptionChange, applications, onAddApplication, onDeleteApplication, recommendedAssets }) {
+        function InstitutionRebalanceBlock({ institution, portfolio, movements, redemptions, onRedemptionChange, applications, onAddApplication, onDeleteApplication, recommendedAssets, totalAppliedPerClass }) {
             
             const totalRedeemedInAccount = useMemo(() => {
                 return Object.values(redemptions)
@@ -1718,7 +1728,7 @@
                                                              <input 
                                                                  type="text" 
                                                                  placeholder="R$ 0,00"
-                                                                 value={redemptions[assetId] ? formatCurrency(redemptions[assetId].amount) : ''}
+                                                                 value={redemptions[assetId] ? formatCurrency(redemptions[assetId].amount).replace('R$\u00A0', '') : ''}
                                                                  onChange={(e) => {
                                                                      const val = e.target.value.replace(/\D/g, '');
                                                                      onRedemptionChange(asset, val / 100);
@@ -1739,11 +1749,17 @@
                         {/* Application Section */}
                         <div className="space-y-4">
                             <h3 className="text-xl font-semibold text-green-400 border-b border-slate-700 pb-2">Sugestões de Aplicação</h3>
-                             {Object.entries(movements.toApply).map(([assetClass, amount]) => (
+                             {Object.entries(movements.toApply).map(([assetClass, amount]) => {
+                                const appliedSoFar = totalAppliedPerClass[assetClass] || 0;
+                                const remainingToApply = amount - appliedSoFar;
+
+                                if (remainingToApply <= 1) return null;
+
+                                return (
                                  <div key={assetClass} className="bg-slate-700/50 p-3 rounded-lg">
                                      <div className="flex justify-between items-center mb-2">
                                          <h4 className="font-semibold text-white">{assetClass}</h4>
-                                         <span className="text-sm text-green-400 font-bold">Aplicar ~{formatCurrency(amount)}</span>
+                                         <span className="text-sm text-green-400 font-bold">Falta Aplicar ~{formatCurrency(remainingToApply)}</span>
                                      </div>
                                      {(applications[institution] || []).filter(app => app.Classe === assetClass).map((app, index) => (
                                          <div key={index} className="flex items-center justify-between bg-slate-600/50 p-2 rounded mb-2">
@@ -1762,7 +1778,8 @@
                                          recommendedAssets={recommendedAssets}
                                      />
                                  </div>
-                             ))}
+                                )
+                             })}
                         </div>
                     </div>
                 </div>
@@ -1802,7 +1819,7 @@
                 if (isNaN(num) || num === 0) {
                     setValue('');
                 } else {
-                    setValue(formatCurrency(num));
+                    setValue(formatCurrency(num).replace('R$\u00A0', ''));
                 }
             };
 
@@ -2568,27 +2585,28 @@
         function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
-            const slideConfigs = [
-                { Component: TitleSlide, props: { client, user }, title: "Capa" },
-                { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
-                { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
-                { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
-                { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
-                { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
-            ];
-
-            if (Object.keys(redemptions).length > 0) {
-                slideConfigs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
-            }
+            const slideConfigs = useMemo(() => {
+                const configs = [
+                    { Component: TitleSlide, props: { client, user }, title: "Capa" },
+                    { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
+                    { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
+                    { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
+                    { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
+                    { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
+                ];
+                if (Object.keys(redemptions).length > 0) {
+                    configs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
+                }
+                return configs;
+            }, [client, user, analysis, profile, redemptions, applications, quotations]);
 
             const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
-            const handlePrint = () => {
-                window.print();
-            };
+            const handlePrint = () => window.print();
 
             return (
-                <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col presentation-container">
+                <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
+                    {/* Screen UI: Header and Navigation */}
                     <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
                         <h2 className="font-bold text-white">Modo Apresentação</h2>
                         <div className="flex items-center space-x-4">
@@ -2601,30 +2619,38 @@
                             <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
                         </div>
                     </header>
-                    <main className="flex-1 p-4 overflow-y-auto">
+                    
+                    {/* Screen UI: Interactive Slide View */}
+                    <main className="no-print flex-1 p-4 overflow-y-auto">
                         <div className="w-full h-full relative">
-                           {slideConfigs.map(({ Component, props, title }, index) => {
-                               const slideInfo = { current: index + 1, total: slideConfigs.length };
-                               return (
-                                    <div
-                                        key={index}
-                                        className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
-                                    >
-                                        <div className="presentation-slide hidden">
-                                            {index > 0 && <SlideHeader title={title} />}
-                                            <div className="slide-content-print">
-                                                <Component {...props} />
-                                            </div>
-                                            {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideInfo.total} />}
-                                        </div>
-                                        <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center no-print">
-                                            <Component {...props} />
-                                        </div>
+                           {slideConfigs.map(({ Component, props }, index) => (
+                                <div
+                                    key={`screen-${index}`}
+                                    className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
+                                >
+                                    <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center">
+                                        <Component {...props} />
                                     </div>
-                               )
-                           })}
+                                </div>
+                           ))}
                         </div>
                     </main>
+
+                    {/* Print UI: All slides rendered sequentially */}
+                    <div className="printable-content">
+                        {slideConfigs.map(({ Component, props, title }, index) => {
+                           const slideInfo = { current: index + 1, total: slideConfigs.length };
+                           return (
+                               <div key={`print-${index}`} className="presentation-slide">
+                                   {index > 0 && <SlideHeader title={title} />}
+                                   <div className="slide-content-print">
+                                       <Component {...props} />
+                                   </div>
+                                   {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideConfigs.length} />}
+                               </div>
+                           );
+                        })}
+                    </div>
                 </div>
             );
         }
@@ -2881,9 +2907,9 @@
             const redemptionList = Object.values(redemptions).map(r => r.asset);
             const totals = useMemo(() => {
                 let totalTela = 0, totalResgate = 0;
-                Object.values(redemptions).forEach(({asset}) => {
+                Object.values(redemptions).forEach(({asset, amount}) => {
                      const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                     totalTela += asset.Valor;
+                     totalTela += amount;
                      totalResgate += (quotations[assetId] || 0);
                 });
                 const totalDesagio = totalTela - totalResgate;
@@ -2906,9 +2932,9 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {Object.values(redemptions).map(({ asset }, index) => {
+                                {Object.values(redemptions).map(({ asset, amount }, index) => {
                                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                                    const valorTela = asset.Valor;
+                                    const valorTela = amount;
                                     const valorResgate = quotations[assetId] || 0;
                                     const desagioValor = valorTela - valorResgate;
                                     const desagioPercent = valorTela > 0 ? (desagioValor / valorTela) : 0;
@@ -2919,7 +2945,7 @@
                                             <td className="p-4">
                                                 <input 
                                                     type="text"
-                                                    value={formatCurrency(valorResgate)}
+                                                    value={formatCurrency(valorResgate).replace('R$\u00A0', '')}
                                                     onChange={(e) => handleQuoteChange(assetId, e.target.value)}
                                                     className="w-36 px-2 py-1 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:ring-2 focus:ring-sky-500 focus:outline-none"
                                                 />
@@ -2983,9 +3009,9 @@
         const QuotationSlide = ({ redemptions, quotations }) => {
             const totals = useMemo(() => {
                 let totalTela = 0, totalResgate = 0;
-                Object.values(redemptions).forEach(({asset}) => {
+                Object.values(redemptions).forEach(({asset, amount}) => {
                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                    totalTela += asset.Valor;
+                    totalTela += amount;
                     totalResgate += (quotations[assetId] || 0);
                 });
                 const totalDesagio = totalTela - totalResgate;
@@ -3007,9 +3033,9 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {Object.values(redemptions).map(({ asset }, index) => {
+                                {Object.values(redemptions).map(({ asset, amount }, index) => {
                                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                                    const valorTela = asset.Valor;
+                                    const valorTela = amount;
                                     const valorResgate = quotations[assetId] || 0;
                                     const desagioValor = valorTela - valorResgate;
                                     const desagioPercent = valorTela > 0 ? (desagioValor / valorTela) : 0;
@@ -3045,5 +3071,3 @@
     </script>
 </body>
 </html>
-
-
