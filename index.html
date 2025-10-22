@@ -1493,6 +1493,29 @@
             );
         };
 
+        function IssuerView({ analysis }) {
+            const issuerData = useMemo(() => {
+                if (!analysis || !analysis.issuerConcentration) return null;
+                const sorted = Object.entries(analysis.issuerConcentration)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value);
+                return {
+                    chartData: sorted,
+                    totalValue: analysis.totalValue
+                };
+            }, [analysis]);
+
+            if (!issuerData) {
+                return <div className="text-center p-10 bg-slate-800 rounded-lg"><h3 className="text-lg text-slate-400">Nenhum emissor identificado no portfólio.</h3></div>;
+            }
+
+            return (
+                <div className="space-y-6">
+                    <CssBarChart data={issuerData.chartData} title="Concentração por Emissor" />
+                </div>
+            )
+        }
+
         function ComparisonView({ analysis, profile }) {
             const comparisonData = useMemo(() => {
                 if (!analysis || !profile || !profile.allocations) return null;
@@ -3353,3 +3376,4 @@
     </script>
 </body>
 </html>
+
