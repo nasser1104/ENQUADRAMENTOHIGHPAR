@@ -1454,6 +1454,13 @@
                     return acc;
                 }, {});
                 
+                const currentByClassForChart = Object.entries(analysis.portfolio.reduce((acc, asset) => {
+                    const key = asset.Classe;
+                    if(!acc[key]) acc[key] = 0;
+                    acc[key] += asset.Valor;
+                    return acc;
+                }, {})).map(([name, value]) => ({name, value}));
+
                 const recommendedChartData = profile.allocations.reduce((acc, alloc) => {
                     const key = alloc.Classe;
                     const value = (alloc.percentage / 100) * totalValue;
@@ -1467,7 +1474,7 @@
 
                 return {
                     comparison,
-                    currentChartData: Object.entries(currentAllocationByClass).map(([name, data]) => ({name, value: data.value})).filter(d => d.value > 0),
+                    currentChartData: currentByClassForChart,
                     recommendedChartData: Object.values(recommendedChartData).filter(d => d.value > 0),
                     institutionalChartData: Object.entries(institutionalData).map(([name, value]) => ({ name, value })).filter(d => d.value > 0)
                 };
@@ -1943,7 +1950,7 @@
 
             return (
                 <div>
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold text-slate-300">Gerenciar Perfis de Investidor</h2>
                         <button onClick={openNewModal} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
                             <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
@@ -2216,7 +2223,7 @@
             
              return (
                  <div>
-                     <div className="flex justify-between items-center mb-6">
+                     <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
                          <h2 className="text-2xl font-bold text-slate-300">Gerenciar Ativos Recomendados</h2>
                          <button onClick={openNewModal} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
                              <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
@@ -2419,7 +2426,7 @@
 
             return (
                 <div>
-                     <div className="flex justify-between items-center mb-6">
+                     <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold text-slate-300">Gerenciar Classes e Subclasses</h2>
                         <div className="flex items-center space-x-4">
                              <button onClick={handleSeedData} disabled={seeding || classes.length > 0} className="flex items-center bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-800 disabled:cursor-not-allowed">
@@ -2577,10 +2584,7 @@
             const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
             const handlePrint = () => {
-                const root = document.getElementById('root');
-                root.style.display = 'none'; // Hide the main app
                 window.print();
-                root.style.display = 'flex'; // Show it again after print dialog
             };
 
             return (
@@ -2604,15 +2608,18 @@
                                return (
                                     <div
                                         key={index}
-                                        className={`presentation-slide absolute top-0 left-0 w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg transition-opacity duration-300 ease-in-out flex flex-col justify-start ${
-                                            index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible'
-                                        }`}
+                                        className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
                                     >
-                                        {index > 0 && <SlideHeader title={title} />}
-                                        <div className="slide-content-print">
+                                        <div className="presentation-slide hidden">
+                                            {index > 0 && <SlideHeader title={title} />}
+                                            <div className="slide-content-print">
+                                                <Component {...props} />
+                                            </div>
+                                            {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideInfo.total} />}
+                                        </div>
+                                        <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center no-print">
                                             <Component {...props} />
                                         </div>
-                                        {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideInfo.total} />}
                                     </div>
                                )
                            })}
