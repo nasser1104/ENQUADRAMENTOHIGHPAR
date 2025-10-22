@@ -742,6 +742,7 @@
             const [activeTab, setActiveTab] = useState('consolidada');
             const [portfolio, setPortfolio] = useState([]);
             const [presentationMode, setPresentationMode] = useState(false);
+            const [observations, setObservations] = useState('');
             
             const [redemptions, setRedemptions] = useState({});
             const [applications, setApplications] = useState({});
@@ -767,6 +768,7 @@
                         const clientData = { id: doc.id, ...doc.data() };
                         setClient(clientData);
                         setPortfolio(clientData.portfolioData || []);
+                        setObservations(clientData.observations || '');
 
                         if (clientData.profileId) {
                             try {
@@ -844,6 +846,20 @@
                     return acc;
                 }, {});
             }, [applications]);
+            
+            const handleSaveObservations = async () => {
+                if (!client) return;
+                try {
+                    await db.collection("clients").doc(client.id).update({
+                        observations: observations
+                    });
+                    // Simple feedback, can be improved with a toast notification
+                    alert("Observações salvas com sucesso!");
+                } catch (error) {
+                    console.error("Error saving observations:", error);
+                    alert("Erro ao salvar as observações.");
+                }
+            };
 
             if (loading) return <div className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></div>;
             if (!client) return <div className="text-center p-8 text-slate-400">Cliente não encontrado.</div>;
@@ -858,6 +874,7 @@
                         redemptions={redemptions}
                         applications={applications}
                         quotations={quotations}
+                        observations={observations}
                         onClose={() => setPresentationMode(false)}
                     />
                 );
@@ -906,6 +923,9 @@
                                 setApplications={setApplications}
                                 recommendedAssets={recommendedAssets}
                                 totalAppliedPerClass={totalAppliedPerClass}
+                                observations={observations}
+                                setObservations={setObservations}
+                                onSaveObservations={handleSaveObservations}
                             />
                         </div>
                         <div style={{ display: activeTab === 'cotacao' ? 'block' : 'none' }}>
@@ -1207,11 +1227,11 @@
                 <div className="space-y-6">
                     <div className="flex justify-between items-start">
                          <div>
-                            <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-lg mb-2">
+                            <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-lg mb-2 w-fit">
                                 <button onClick={() => setViewType('estrategia')} className={`px-3 py-1 text-xs font-semibold rounded-md ${viewType === 'estrategia' ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Por Estratégia</button>
                                 <button onClick={() => setViewType('tipo')} className={`px-3 py-1 text-xs font-semibold rounded-md ${viewType === 'tipo' ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Por Tipo</button>
                             </div>
-                            <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-lg">
+                            <div className="flex items-center flex-wrap gap-2 bg-slate-800 p-1 rounded-lg">
                                  <button onClick={() => setSelectedInstitution('Todas')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${selectedInstitution === 'Todas' ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>
                                      Todas as Contas
                                  </button>
@@ -1545,7 +1565,7 @@
             );
         }
 
-        function RebalanceWorkspace({ analysis, profile, redemptions, setRedemptions, applications, setApplications, recommendedAssets, totalAppliedPerClass }) {
+        function RebalanceWorkspace({ analysis, profile, redemptions, setRedemptions, applications, setApplications, recommendedAssets, totalAppliedPerClass, observations, setObservations, onSaveObservations }) {
 
             const movements = useMemo(() => {
                 if (!analysis || !profile || !profile.allocations) return null;
@@ -1638,6 +1658,24 @@
 
             return (
                 <div className="space-y-8">
+                    <div className="bg-slate-800 p-6 rounded-xl shadow-lg">
+                        <h2 className="text-2xl font-bold text-white mb-4">Observações sobre o Plano</h2>
+                        <textarea
+                            className="w-full h-32 p-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            placeholder="Descreva a estratégia, os motivos das movimentações e outros pontos importantes para o cliente..."
+                            value={observations}
+                            onChange={(e) => setObservations(e.target.value)}
+                        ></textarea>
+                        <div className="text-right mt-4">
+                            <button
+                                onClick={onSaveObservations}
+                                className="bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors"
+                            >
+                                Salvar Observações
+                            </button>
+                        </div>
+                    </div>
+
                     {analysis.institutions.map(institution => (
                         <InstitutionRebalanceBlock 
                             key={institution}
@@ -2582,7 +2620,7 @@
             </div>
         );
 
-        function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, onClose }) {
+        function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, observations, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
             const slideConfigs = useMemo(() => {
@@ -2592,13 +2630,19 @@
                     { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
                     { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
                     { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
+                    { Component: ObservationsSlide, props: { observations }, title: "Observações e Estratégia"},
                     { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
                 ];
+
+                if (Object.keys(redemptions).length > 0 || Object.keys(applications).length > 0) {
+                     configs.push({ Component: ProjectedPortfolioSlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada" });
+                }
+
                 if (Object.keys(redemptions).length > 0) {
                     configs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
                 }
                 return configs;
-            }, [client, user, analysis, profile, redemptions, applications, quotations]);
+            }, [client, user, analysis, profile, redemptions, applications, quotations, observations]);
 
             const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
             const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
@@ -2821,6 +2865,15 @@
             );
         };
 
+        const ObservationsSlide = ({ observations }) => (
+            <div className="h-full flex flex-col">
+                <h3 className="text-2xl font-bold text-white mb-6">Observações e Estratégia</h3>
+                <div className="flex-grow bg-slate-800 p-6 rounded-xl text-slate-300 whitespace-pre-wrap overflow-y-auto">
+                    {observations || "Nenhuma observação adicionada."}
+                </div>
+            </div>
+        );
+
         const RebalancePlanSlide = ({ redemptions, applications }) => {
             const totalRedeemed = Object.values(redemptions).reduce((sum, { amount }) => sum + amount, 0);
             const totalApplied = Object.values(applications).flat().reduce((sum, app) => sum + app.value, 0);
@@ -2869,6 +2922,109 @@
                     </div>
                 </React.Fragment>
             )
+        };
+
+        const ProjectedPortfolioSlide = ({ analysis, redemptions, applications }) => {
+            const projectedAnalysis = useMemo(() => {
+                if (!analysis) return null;
+
+                // 1. Start with original portfolio
+                let projectedPortfolio = JSON.parse(JSON.stringify(analysis.portfolio));
+
+                // 2. Apply redemptions
+                const redemptionMap = {};
+                Object.values(redemptions).forEach(({ asset, amount }) => {
+                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                    redemptionMap[assetId] = (redemptionMap[assetId] || 0) + amount;
+                });
+
+                projectedPortfolio = projectedPortfolio.map(asset => {
+                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                    if (redemptionMap[assetId]) {
+                        asset.Valor -= redemptionMap[assetId];
+                    }
+                    return asset;
+                }).filter(asset => asset.Valor > 0.01); // Filter out assets that were fully redeemed
+
+                // 3. Apply applications
+                Object.entries(applications).forEach(([institution, apps]) => {
+                    apps.forEach(app => {
+                        const [inst, conta] = institution.split(' - ');
+                        projectedPortfolio.push({
+                            "Instituição": inst,
+                            "Número da Conta": conta || '',
+                            "Nome": app.name,
+                            "Valor": app.value,
+                            "Classe": app.Classe.split(' - ')[0],
+                            "Subclasse": app.Classe.split(' - ')[1] || '',
+                            "Emissor": '',
+                            "Vencimento": '',
+                            "Taxa": '',
+                            "Liquidez": '',
+                            "Tipo de Ativo": 'Novo Ativo', // Placeholder
+                        });
+                    });
+                });
+
+                if (projectedPortfolio.length === 0) return { totalValue: 0, chartData: [], portfolio: [] };
+
+                const newTotalValue = projectedPortfolio.reduce((sum, asset) => sum + asset.Valor, 0);
+
+                const newAllocationByClass = projectedPortfolio.reduce((acc, asset) => {
+                    const key = asset.Classe;
+                    if (!acc[key]) acc[key] = { name: key, value: 0 };
+                    acc[key].value += asset.Valor;
+                    return acc;
+                }, {});
+
+                return {
+                    totalValue: newTotalValue,
+                    chartData: Object.values(newAllocationByClass),
+                    portfolio: projectedPortfolio,
+                };
+            }, [analysis, redemptions, applications]);
+
+            if (!projectedAnalysis) {
+                return <p className="text-slate-400">Não foi possível projetar a nova carteira.</p>;
+            }
+
+            return (
+                <div className="grid grid-cols-2 gap-8 h-full">
+                    <div className="flex flex-col">
+                         <h3 className="text-2xl font-bold text-white mb-4">Carteira Projetada</h3>
+                         <p className="text-slate-400 mb-4">Valor Total: <span className="font-bold text-white">{formatCurrency(projectedAnalysis.totalValue)}</span></p>
+                         <div className="flex-grow">
+                            <SvgPieChart data={projectedAnalysis.chartData} title="Nova Distribuição por Estratégia" />
+                         </div>
+                    </div>
+                    <div className="bg-slate-800 p-4 rounded-xl flex flex-col">
+                         <h4 className="text-xl font-semibold text-white mb-4">Novos Ativos da Carteira</h4>
+                         <div className="flex-grow overflow-y-auto">
+                            <table className="w-full text-left">
+                                <thead className="sticky top-0 bg-slate-800">
+                                    <tr className="border-b border-slate-700">
+                                        <th className="p-2 text-sm text-slate-300">Ativo</th>
+                                        <th className="p-2 text-sm text-slate-300 text-right">Valor</th>
+                                        <th className="p-2 text-sm text-slate-300 text-right">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {projectedAnalysis.portfolio.sort((a,b) => b.Valor - a.Valor).map((asset, i) => (
+                                        <tr key={i} className="border-b border-slate-700/50">
+                                            <td className="p-2 text-sm">
+                                                <p className="font-medium text-white truncate" title={asset.Nome}>{asset.Nome}</p>
+                                                <p className="text-xs text-slate-400">{asset.Instituição}</p>
+                                            </td>
+                                            <td className="p-2 text-sm text-slate-300 text-right">{formatCurrency(asset.Valor)}</td>
+                                            <td className="p-2 text-sm text-white font-semibold text-right">{formatPercent(asset.Valor / projectedAnalysis.totalValue)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                         </div>
+                    </div>
+                </div>
+            );
         };
         
         // --- NEW COMPONENTS ---
@@ -3071,3 +3227,4 @@
     </script>
 </body>
 </html>
+
