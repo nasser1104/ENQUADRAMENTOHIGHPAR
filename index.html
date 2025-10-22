@@ -173,16 +173,16 @@
             }
 
              /* Adjust font sizes within content for print */
-            .slide-content-print h1 { font-size: 2rem !important; }
-            .slide-content-print h2 { font-size: 1.5rem !important; }
-            .slide-content-print h3 { font-size: 1.1rem !important; }
-            .slide-content-print p, .slide-content-print li, .slide-content-print span { font-size: 10px !important; }
-            .slide-content-print th, .slide-content-print td { font-size: 9px !important; padding: 0.25rem 0.5rem !important; } /* Smaller table text and padding */
-            .slide-content-print .text-xs { font-size: 8px !important; }
-            .slide-content-print .text-sm { font-size: 9px !important; }
-            .slide-content-print .text-base { font-size: 10px !important; }
-            .slide-content-print .text-lg { font-size: 11px !important; }
-            .slide-content-print .text-xl { font-size: 12px !important; }
+            .presentation-slide h1 { font-size: 2rem !important; }
+            .presentation-slide h2 { font-size: 1.5rem !important; }
+            .presentation-slide h3 { font-size: 1.1rem !important; }
+            .presentation-slide p, .presentation-slide li, .presentation-slide span { font-size: 10px !important; }
+            .presentation-slide th, .presentation-slide td { font-size: 9px !important; padding: 0.25rem 0.5rem !important; } /* Smaller table text and padding */
+            .presentation-slide .text-xs { font-size: 8px !important; }
+            .presentation-slide .text-sm { font-size: 9px !important; }
+            .presentation-slide .text-base { font-size: 10px !important; }
+            .presentation-slide .text-lg { font-size: 11px !important; }
+            .presentation-slide .text-xl { font-size: 12px !important; }
         }
 
     </style>
@@ -308,7 +308,8 @@
         const formatDisplayDate = (dateValue) => {
             const date = parseDate(dateValue);
             if (date) {
-                return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
+                // Format date only, without time and timezone for simplicity in the cover slide
+                return new Intl.DateTimeFormat('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' }).format(date);
             }
             // If parsing failed but we have an original value, show it
             if (dateValue) return dateValue.toString();
@@ -1072,6 +1073,7 @@
                     return p.Instituição + (p["Número da Conta"] ? ` - ${p["Número da Conta"]}` : '');
                 }))];
 
+                // --- Allocation by Class (Detailed: Class - Subclass) ---
                 const currentAllocationByClass = portfolio.reduce((acc, asset) => {
                     const key = asset.Classe + (asset.Subclasse ? ` - ${asset.Subclasse}` : '');
                     if (!acc[key]) {
@@ -1080,18 +1082,53 @@
                     acc[key].value += (asset.Valor || 0);
                     return acc;
                 }, {});
-
                 Object.keys(currentAllocationByClass).forEach(key => {
                     currentAllocationByClass[key].percentage = currentAllocationByClass[key].value / totalValue;
                 });
 
+                 // --- Allocation by Master Class (Class only) for Charts ---
+                 const currentAllocationByMasterClass = portfolio.reduce((acc, asset) => {
+                     const key = (asset.Classe || '').split(' - ')[0].trim();
+                     if (!key) return acc;
+                     if (!acc[key]) acc[key] = { value: 0 };
+                     acc[key].value += (asset.Valor || 0);
+                     return acc;
+                 }, {});
+                 const currentChartData = Object.entries(currentAllocationByMasterClass)
+                                            .map(([name, data]) => ({ name, value: data.value }))
+                                            .filter(d => d.value > 0); // Filter zero values for chart
+
+
+                // --- Recommended Allocation by Master Class (for Chart) ---
+                let recommendedChartData = [];
+                if (profile && profile.allocations) {
+                    const recommendedByMasterClass = profile.allocations.reduce((acc, alloc) => {
+                         const key = (alloc.Classe || '').split(' - ')[0].trim();
+                         if (!key) return acc;
+                         const value = (alloc.percentage / 100) * totalValue;
+                         if(!acc[key]) {
+                             acc[key] = { name: key, value: 0};
+                         }
+                         acc[key].value += value;
+                         return acc;
+                     }, {});
+                     recommendedChartData = Object.values(recommendedByMasterClass).filter(d => d.value > 0);
+                }
+
+
+                // --- Issuer Concentration ---
                 const issuerConcentration = portfolio.reduce((acc, asset) => {
                     const key = asset.Emissor || 'Não Especificado';
                     if(!acc[key]) acc[key] = 0;
                     acc[key] += (asset.Valor || 0);
                     return acc;
                 }, {});
+                const issuerChartData = Object.entries(issuerConcentration)
+                                           .map(([name, value]) => ({ name, value }))
+                                           .filter(item => item.value >= 0.01) // Filter negligible before sort
+                                           .sort((a, b) => b.value - a.value);
 
+                // --- Allocation by Asset Type ---
                 const allocationByAssetType = portfolio.reduce((acc, asset) => {
                     const key = asset['Tipo de Ativo'] || 'Não Especificado';
                     if (!acc[key]) acc[key] = { value: 0, assets: [] };
@@ -1099,12 +1136,23 @@
                     acc[key].assets.push(asset);
                     return acc;
                 }, {});
-
                 Object.keys(allocationByAssetType).forEach(key => {
                     allocationByAssetType[key].percentage = allocationByAssetType[key].value / totalValue;
                 });
 
-                 // --- NEW Liquidity Calculation ---
+                // --- Allocation by Institution ---
+                const institutionalData = portfolio.reduce((acc, asset) => {
+                    const account = asset.Instituição + (asset["Número da Conta"] ? ` - ${asset["Número da Conta"]}` : '');
+                    if (!acc[account]) acc[account] = 0;
+                    acc[account] += (asset.Valor || 0);
+                    return acc;
+                }, {});
+                const institutionalChartData = Object.entries(institutionalData)
+                                                .map(([name, value]) => ({ name, value }))
+                                                .filter(d => d.value > 0);
+
+
+                 // --- Liquidity Calculation ---
                  const today = new Date();
                  const liquidityBuckets = { 'D+0': 0, 'D+5': 0, 'D+30': 0, 'D+180': 0, 'D+365': 0, '>D+365': 0 };
                  portfolio.forEach(asset => {
@@ -1123,8 +1171,21 @@
                  })).filter(b => b.value > 0); // Only show buckets with value
 
 
-                return { totalValue, institutions, currentAllocationByClass, portfolio, issuerConcentration, allocationByAssetType, liquidityAnalysis };
-            }, [portfolio]);
+                return {
+                    totalValue,
+                    institutions,
+                    currentAllocationByClass, // Detailed map
+                    currentChartData, // Aggregated for chart
+                    recommendedChartData, // Aggregated for chart
+                    portfolio,
+                    issuerConcentration, // Raw map for IssuerView
+                    issuerChartData, // Formatted array for chart
+                    allocationByAssetType, // For Consolidated View (by type)
+                    institutionalChartData, // Formatted array for chart
+                    liquidityAnalysis
+                };
+            }, [portfolio, profile]); // Add profile as dependency
+
 
             // --- Moved from RebalanceWorkspace ---
             const totalAppliedPerClass = useMemo(() => {
@@ -1166,13 +1227,13 @@
 
             // Separate Presentation component rendering logic
             if (presentationMode) {
-                 // Important: Pass portfolioAnalysis which now includes liquidityAnalysis
+                 // Important: Pass portfolioAnalysis which now includes liquidityAnalysis and chart data
                  const presentationComponent = (
                      <PresentationView
                          client={client}
                          profile={profile}
                          user={user}
-                         analysis={portfolioAnalysis} // Pass the calculated analysis
+                         analysis={portfolioAnalysis} // Pass the calculated analysis object
                          redemptions={redemptions}
                          applications={applications}
                          quotations={quotations}
@@ -1180,9 +1241,7 @@
                          onClose={() => setPresentationMode(false)}
                      />
                  );
-                 // Use React Portal to render it outside the main component tree if needed, or render directly
-                 // For simplicity, let's render directly here. Consider Portal if layout issues arise.
-                  return presentationComponent;
+                 return presentationComponent;
             }
 
             return (
@@ -1202,7 +1261,7 @@
                     <div className="flex justify-between items-center border-b border-slate-700 no-print">
                         <nav className="flex space-x-1 sm:space-x-6">
                             <TabButton name="Consolidada" id="consolidada" activeTab={activeTab} setActiveTab={setActiveTab} />
-                            <TabButton name="Liquidez" id="liquidez" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis}/> {/* NEW Liquidity Tab */}
+                            <TabButton name="Liquidez" id="liquidez" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis}/>
                             <TabButton name="Comparativo" id="comparativo" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis || !profile}/>
                             <TabButton name="Emissores" id="emissores" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis} />
                             <TabButton name="Rebalanceamento" id="rebalanceamento" activeTab={activeTab} setActiveTab={setActiveTab} disabled={!portfolioAnalysis || !profile} />
@@ -1216,7 +1275,6 @@
 
                     <div>
                         <div style={{ display: activeTab === 'consolidada' ? 'block' : 'none' }}><ConsolidatedView analysis={portfolioAnalysis} /></div>
-                        {/* NEW Liquidity Tab Content */}
                         <div style={{ display: activeTab === 'liquidez' ? 'block' : 'none' }}>
                             <LiquidityAnalysis analysis={portfolioAnalysis} />
                         </div>
@@ -1231,7 +1289,7 @@
                                 applications={applications}
                                 setApplications={setApplications}
                                 recommendedAssets={recommendedAssets}
-                                totalAppliedPerClass={totalAppliedPerClass} // Pass calculated value
+                                totalAppliedPerClass={totalAppliedPerClass}
                                 observations={observations}
                                 setObservations={setObservations}
                                 onSaveObservations={handleSaveObservations}
@@ -1271,7 +1329,7 @@
              const fileInputRef = React.useRef(null);
 
              const handleDownloadModelo = () => {
-                 // ... (download logic from previous code) ...
+                 // ... (download logic remains the same) ...
                 const wb = XLSX.utils.book_new();
 
                 // Define lists for dropdowns
@@ -1397,10 +1455,10 @@
 
                 // Write the file
                 XLSX.writeFile(wb, "Planilha_Modelo_Highpar.xlsx");
-
              };
 
              const processAndUpload = (jsonData, originalFile) => {
+                 // ... (processAndUpload logic remains the same) ...
                  setUploading(true);
                  setError(null);
                   try {
@@ -1495,6 +1553,7 @@
 
 
             const handleFileUpload = (event) => {
+                // ... (handleFileUpload logic remains the same) ...
                 const file = event.target.files[0];
                 if (!file) return;
                 setUploading(true);
@@ -1581,6 +1640,7 @@
         // --- TAB COMPONENTS for ClientDetail ---
         // ConsolidatedView
         function ConsolidatedView({ analysis }) {
+            // ... (ConsolidatedView logic remains the same) ...
             const [selectedInstitution, setSelectedInstitution] = useState('Todas');
             const [viewType, setViewType] = useState('estrategia');
 
@@ -1826,7 +1886,7 @@
 
             return (
                 <div className="bg-slate-800 p-6 rounded-xl flex flex-col h-full svg-pie-chart-container">
-                    <h3 className="text-xl font-semibold mb-4 text-white text-center">{title}</h3>
+                    {title && <h3 className="text-xl font-semibold mb-4 text-white text-center">{title}</h3>}
                     <div className="flex-grow flex items-center justify-center my-4"> {/* Added margin */}
                          <svg viewBox="0 0 200 200" className="w-48 h-48 transform -rotate-90">
                              {segments.map((segment, index) => {
@@ -1852,7 +1912,7 @@
                     </div>
                     {/* Legend with scroll */}
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm max-h-32 overflow-y-auto pr-2">
-                        {segments.map((segment, index) => (
+                        {segments.sort((a,b) => b.value - a.value).map((segment, index) => ( // Sort legend by value
                             <div key={index} className="flex items-center">
                                 <div className="w-3 h-3 rounded-sm mr-2 flex-shrink-0" style={{ backgroundColor: segment.color }}></div>
                                 <span className="text-slate-300 truncate mr-2" title={segment.name}>{segment.name}</span>
@@ -1875,7 +1935,7 @@
 
              return (
                   <div className="bg-slate-800 p-6 rounded-xl css-bar-chart-container">
-                      <h3 className="text-xl font-semibold mb-4 text-white">{title}</h3>
+                      {title && <h3 className="text-xl font-semibold mb-4 text-white">{title}</h3>}
                       <div className="space-y-3">
                           {validData.map((item, index) => ( // Use validData here
                               <div key={index} className="grid grid-cols-4 gap-4 items-center group">
@@ -1908,7 +1968,7 @@
              const comparisonData = useMemo(() => {
                  if (!analysis || !profile || !profile.allocations) return null;
 
-                 const { totalValue, currentAllocationByClass } = analysis;
+                 const { totalValue, currentAllocationByClass } = analysis; // Uses detailed keys
 
                  // Recommended Map (using normalized keys)
                  const recommendedAllocationMap = profile.allocations.reduce((acc, alloc) => {
@@ -1965,45 +2025,12 @@
                  .filter(item => item.recommendedPercent > 0 || item.currentPercent > 0); // Filter out zero items
 
 
-                 // Data for Charts (Grouped by Master Class)
-                  const groupToMasterClass = (portfolioItems) => {
-                      return Object.entries(portfolioItems.reduce((acc, asset) => {
-                         // Use only the main class name (before ' - ') for grouping
-                         const key = (asset.Classe || '').split(' - ')[0].trim();
-                         if (!key) return acc; // Skip if Classe is missing/empty
-                         if(!acc[key]) acc[key] = 0;
-                         acc[key] += (asset.Valor || 0);
-                         return acc;
-                      }, {})).map(([name, value]) => ({name, value}));
-                  };
-
-                  const currentByMasterClass = groupToMasterClass(analysis.portfolio);
-
-                  const recommendedByMasterClass = profile.allocations.reduce((acc, alloc) => {
-                       // Use only the main class name for grouping
-                       const key = (alloc.Classe || '').split(' - ')[0].trim();
-                       if (!key) return acc; // Skip if Classe is missing/empty
-                       const value = (alloc.percentage / 100) * totalValue;
-                       if(!acc[key]) {
-                           acc[key] = { name: key, value: 0};
-                       }
-                       acc[key].value += value;
-                       return acc;
-                   }, {});
-
-                 const institutionalData = analysis.portfolio.reduce((acc, asset) => {
-                     const account = asset.Instituição + (asset["Número da Conta"] ? ` - ${asset["Número da Conta"]}` : '');
-                     if (!acc[account]) acc[account] = 0;
-                     acc[account] += (asset.Valor || 0);
-                     return acc;
-                 }, {});
-
-
+                 // Use pre-calculated chart data from analysis
                  return {
                      comparison,
-                     currentChartData: currentByMasterClass, // Use master class data for chart
-                     recommendedChartData: Object.values(recommendedByMasterClass).filter(d => d.value > 0), // Use master class data
-                     institutionalChartData: Object.entries(institutionalData).map(([name, value]) => ({ name, value })).filter(d => d.value > 0)
+                     currentChartData: analysis.currentChartData || [],
+                     recommendedChartData: analysis.recommendedChartData || [],
+                     institutionalChartData: analysis.institutionalChartData || []
                  };
              }, [analysis, profile]);
 
@@ -2019,7 +2046,6 @@
             return (
                 <div className="space-y-8">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Charts now use master class data */}
                         <SvgPieChart data={comparisonData.currentChartData} title="Carteira Atual (por Classe)" />
                         <SvgPieChart data={comparisonData.recommendedChartData} title="Carteira Recomendada (por Classe)" />
                     </div>
@@ -2073,27 +2099,16 @@
 
         // IssuerView
          function IssuerView({ analysis }) {
-             const issuerData = useMemo(() => {
-                 if (!analysis || !analysis.issuerConcentration) return null;
-                 const sorted = Object.entries(analysis.issuerConcentration)
-                     .map(([name, value]) => ({ name, value }))
-                      // Filter out issuers with zero or negligible value before sorting
-                     .filter(item => item.value >= 0.01)
-                     .sort((a, b) => b.value - a.value);
-                 return {
-                     chartData: sorted,
-                     totalValue: analysis.totalValue
-                 };
-             }, [analysis]);
+             // Use pre-calculated issuerChartData from analysis
+             const issuerChartData = analysis?.issuerChartData || [];
 
-             if (!issuerData || issuerData.chartData.length === 0) {
+             if (!analysis || issuerChartData.length === 0) {
                  return <div className="text-center p-10 bg-slate-800 rounded-lg"><h3 className="text-lg text-slate-400">Nenhum emissor identificado ou todos com valor zero.</h3></div>;
              }
 
              return (
                  <div className="space-y-6">
-                      {/* Pass chartData which is already sorted and filtered */}
-                     <CssBarChart data={issuerData.chartData} title="Concentração por Emissor" />
+                     <CssBarChart data={issuerChartData} title="Concentração por Emissor" />
                  </div>
              )
          }
@@ -2101,6 +2116,7 @@
 
         // RebalanceWorkspace
         function RebalanceWorkspace({ analysis, profile, redemptions, setRedemptions, applications, setApplications, recommendedAssets, totalAppliedPerClass, observations, setObservations, onSaveObservations }) {
+            // ... (RebalanceWorkspace logic remains the same) ...
             const movements = useMemo(() => {
                 if (!analysis || !profile || !profile.allocations) return null;
                 const { totalValue, currentAllocationByClass } = analysis; // currentAllocationByClass IS using detailed keys
@@ -2550,7 +2566,7 @@
 
                          <div className="flex space-x-2">
                              <input
-                                 type="text" // Keep as text to handle formatting
+                                 type="text" // Keep as text for formatting
                                  placeholder="R$ 0,00"
                                  value={value}
                                  onChange={handleValueChange}
@@ -3517,21 +3533,26 @@
         }
 
         // --- PresentationView and Slide Components ---
-        // SlideHeader and SlideFooter
+        // SlideHeader and SlideFooter (Updated footer for print)
         const SlideHeader = ({ title }) => (
              <div className="slide-header-print flex justify-between items-center border-b border-slate-700 pb-2 mb-4">
                  <h2 className="text-lg font-semibold text-sky-400">{title}</h2>
-                 <Icon path={ICONS.CHART} className="h-6 w-6 text-sky-400" />
+                 {/* Only show HIGHPAR text in print header */}
+                 <h1 className="text-xl font-bold text-sky-500 hidden print:block">HIGHPAR</h1>
+                 <Icon path={ICONS.CHART} className="h-6 w-6 text-sky-400 print:hidden" /> {/* Hide icon in print */}
              </div>
         );
 
+        // Updated SlideFooter to show only HIGHPAR and simplified date/page for print
         const SlideFooter = ({ pageNumber, totalPages }) => (
             <div className="slide-footer-print text-center text-xs text-slate-400 border-t border-slate-700 pt-2 mt-auto">
-                HIGHPAR | {formatDisplayDate(new Date())} | Página {pageNumber} de {totalPages}
+                <span className="print:hidden">HIGHPAR | {formatDisplayDate(new Date())} | Página {pageNumber} de {totalPages}</span>
+                <span className="hidden print:inline">HIGHPAR | {formatDisplayDate(new Date())} | {pageNumber} / {totalPages}</span>
             </div>
         );
 
-        // General slide wrapper
+
+        // General slide wrapper (remains mostly the same)
         const PresentationSlide = ({ title, children, pageNumber, totalPages, className = "" }) => (
             <div className={`presentation-slide flex flex-col p-8 bg-slate-900 border border-slate-700 rounded-lg shadow-xl ${className}`}>
                 <SlideHeader title={title} />
@@ -3542,52 +3563,59 @@
             </div>
         );
 
-        // --- Specific Slide Content Components ---
+        // --- Specific Slide Content Components (Updated) ---
+        // CoverSlide (Updated content)
         const CoverSlide = ({ client, user, pageNumber, totalPages }) => (
             <PresentationSlide title="" pageNumber={pageNumber} totalPages={totalPages} className="items-center justify-center text-center">
-                <Icon path={ICONS.CHART} className="h-24 w-24 text-sky-400 mb-6" />
-                <h1 className="text-4xl font-bold mb-4 text-white">Análise e Rebalanceamento de Carteira</h1>
-                <p className="text-2xl text-slate-300 mb-8">{client.name}</p>
-                <p className="text-lg text-slate-400">Preparado por: {user?.name || 'Consultor'}</p>
-                <p className="text-lg text-slate-400">Data: {formatDisplayDate(new Date())}</p>
+                {/* <Icon path={ICONS.CHART} className="h-24 w-24 text-sky-400 mb-6" /> Removed Icon */}
+                <h1 className="text-5xl font-bold text-sky-400 mb-10">HIGHPAR</h1> {/* Added HIGHPAR title */}
+                <h2 className="text-3xl font-bold mb-4 text-white">Análise e Rebalanceamento de Carteira</h2>
+                <p className="text-2xl text-slate-300 mb-12">{client.name}</p>
+                {/* <p className="text-lg text-slate-400">Preparado por: {user?.name || 'Consultor'}</p> */}
+                <p className="text-lg text-slate-400 mt-auto">Data: {formatDisplayDate(new Date())}</p> {/* Moved Date to bottom */}
             </PresentationSlide>
         );
 
+        // SummarySlide (Updated to include recommended and institutional charts)
         const SummarySlide = ({ analysis, profile, pageNumber, totalPages }) => (
-            <PresentationSlide title="Resumo da Carteira Atual" pageNumber={pageNumber} totalPages={totalPages}>
+            <PresentationSlide title="Resumo da Carteira" pageNumber={pageNumber} totalPages={totalPages}>
                 {!analysis ? <p className="text-slate-400">Dados da carteira não disponíveis.</p> : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                        <div>
+                    <div className="flex flex-col h-full"> {/* Ensure flex column for layout */}
+                        <div className="mb-6">
                             <h3 className="text-lg font-semibold mb-3 text-white">Informações Gerais</h3>
-                            <p className="text-sm text-slate-400 mb-1">Valor Total: <span className="font-bold text-lg text-white">{formatCurrency(analysis.totalValue)}</span></p>
-                            <p className="text-sm text-slate-400 mb-1">Perfil de Risco: <span className="font-semibold text-white">{profile?.name || 'N/A'}</span></p>
-                            <p className="text-sm text-slate-400 mb-4">Contas Vinculadas: <span className="font-semibold text-white">{analysis.institutions.length}</span></p>
-
-                            {/* Simplified Table for Summary Slide */}
-                            <h3 className="text-lg font-semibold mt-6 mb-3 text-white">Alocação por Classe</h3>
-                            <div className="space-y-1 text-sm">
-                                {Object.entries(analysis.currentAllocationByClass)
-                                    .sort(([,a], [,b]) => b.value - a.value)
-                                    .map(([name, data]) => (
-                                        <div key={name} className="flex justify-between items-center bg-slate-800/50 px-3 py-1 rounded">
-                                            <span className="text-slate-300 truncate pr-2">{name}</span>
-                                            <span className="font-medium text-white whitespace-nowrap">{formatPercent(data.percentage)}</span>
-                                        </div>
-                                ))}
+                            <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                                <div className="bg-slate-800/50 p-3 rounded">
+                                    <p className="text-slate-400 mb-1">Valor Total</p>
+                                    <p className="font-bold text-base text-white">{formatCurrency(analysis.totalValue)}</p>
+                                </div>
+                                <div className="bg-slate-800/50 p-3 rounded">
+                                    <p className="text-slate-400 mb-1">Perfil de Risco</p>
+                                    <p className="font-semibold text-base text-white">{profile?.name || 'N/A'}</p>
+                                </div>
+                                <div className="bg-slate-800/50 p-3 rounded">
+                                    <p className="text-slate-400 mb-1">Contas Vinculadas</p>
+                                    <p className="font-semibold text-base text-white">{analysis.institutions.length}</p>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center justify-center">
-                            <SvgPieChart data={Object.entries(analysis.currentAllocationByClass).map(([name, data])=>({name, value: data.value}))} title="" />
+
+                        {/* Charts take remaining space */}
+                        <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6 items-center justify-center">
+                             {/* Adjust chart components to fit, potentially smaller */}
+                            <SvgPieChart data={analysis.currentChartData || []} title="Carteira Atual (Classe)" />
+                            <SvgPieChart data={analysis.recommendedChartData || []} title="Carteira Recomendada (Classe)" />
+                            <CssBarChart data={analysis.institutionalChartData || []} title="Valor por Instituição"/>
                         </div>
                     </div>
                 )}
             </PresentationSlide>
         );
 
+        // AllocationComparisonSlide (Updated to include visual bars)
         const AllocationComparisonSlide = ({ analysis, profile, pageNumber, totalPages }) => {
-            const comparisonData = useMemo(() => { /* ... Same logic as in ComparisonView ... */
+            const comparisonData = useMemo(() => {
                  if (!analysis || !profile || !profile.allocations) return null;
-                 const { totalValue, currentAllocationByClass } = analysis;
+                 const { totalValue, currentAllocationByClass } = analysis; // Uses detailed keys
                  const recommendedAllocationMap = profile.allocations.reduce((acc, alloc) => {
                      if ((alloc.subcategories || []).length > 0) {
                           alloc.subcategories.forEach(sub => {
@@ -3620,13 +3648,11 @@
                 <PresentationSlide title="Comparativo: Carteira Atual vs. Recomendada" pageNumber={pageNumber} totalPages={totalPages}>
                     {!comparisonData ? <p className="text-slate-400">Dados insuficientes.</p> : (
                         <div className="space-y-4">
-                            {/* Maybe add charts here too, similar to ComparisonView */}
                             <table className="w-full text-left text-sm">
                                 <thead className="border-b border-slate-700">
                                     <tr>
                                         <th className="py-2 pr-2 font-semibold text-slate-300">Classe / Subclasse</th>
-                                        <th className="py-2 px-2 font-semibold text-slate-300 text-right">Atual (%)</th>
-                                        <th className="py-2 px-2 font-semibold text-slate-300 text-right">Recomendado (%)</th>
+                                        <th className="py-2 px-2 font-semibold text-slate-300 w-1/3">Alocação (%)</th> {/* Combined column */}
                                         <th className="py-2 pl-2 font-semibold text-slate-300 text-right">Ajuste Sugerido (R$)</th>
                                     </tr>
                                 </thead>
@@ -3634,10 +3660,25 @@
                                     {comparisonData.map((item, index) => (
                                         <tr key={index} className="border-b border-slate-700/50 last:border-b-0">
                                             <td className="py-2 pr-2 font-medium text-white">{item.name}</td>
-                                            <td className="py-2 px-2 text-slate-300 text-right">{formatPercent(item.currentPercent)}</td>
-                                            <td className="py-2 px-2 text-sky-400 font-semibold text-right">{formatPercent(item.recommendedPercent)}</td>
+                                            <td className="py-2 px-2 text-slate-300"> {/* Bar column */}
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="font-semibold text-white">Atual: {formatPercent(item.currentPercent)}</span>
+                                                        <span className="text-slate-400">Rec: {formatPercent(item.recommendedPercent)}</span>
+                                                    </div>
+                                                    {/* Visual Bar */}
+                                                    <div className="w-full bg-slate-700 rounded-full h-2.5 relative">
+                                                         {/* Current Allocation Bar */}
+                                                         <div className="bg-sky-500 h-2.5 rounded-full" style={{ width: `${Math.min(item.currentPercent * 100, 100)}%` }}></div>
+                                                         {/* Recommended Allocation Marker */}
+                                                         <div className="absolute top-0 bottom-0 border-l-2 border-white" style={{ left: `${Math.min(item.recommendedPercent * 100, 100)}%` }}>
+                                                              <div className="w-1.5 h-1.5 bg-white rounded-full absolute -ml-1 top-1/2 -translate-y-1/2"></div>
+                                                         </div>
+                                                    </div>
+                                                </div>
+                                            </td>
                                             <td className={`py-2 pl-2 text-right font-semibold ${item.diffValue >= -0.01 && item.diffValue <= 0.01 ? 'text-slate-400' : item.diffValue > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                                 {item.diffValue >= -0.01 && item.diffValue <= 0.01 ? 'Manter' : formatCurrency(Math.abs(item.diffValue))}
+                                                 {item.diffValue >= -0.01 && item.diffValue <= 0.01 ? 'Manter' : (item.diffValue > 0 ? `Resgatar ${formatCurrency(item.diffValue)}` : `Aplicar ${formatCurrency(Math.abs(item.diffValue))}`)}
                                             </td>
                                         </tr>
                                     ))}
@@ -3649,20 +3690,66 @@
             );
         };
 
-        const LiquiditySlide = ({ analysis, pageNumber, totalPages }) => (
-            <PresentationSlide title="Análise de Liquidez da Carteira" pageNumber={pageNumber} totalPages={totalPages}>
-                {!analysis || !analysis.liquidityAnalysis ? <p className="text-slate-400">Dados de liquidez não disponíveis.</p> : (
-                    <div className="flex justify-center"> {/* Center the chart */}
-                        <SvgPieChart
-                            data={analysis.liquidityAnalysis}
-                            title="" // Title is already in SlideHeader
-                        />
-                    </div>
+
+        // LiquiditySlide (Updated to show a table instead of pie chart)
+        const LiquiditySlide = ({ analysis, pageNumber, totalPages }) => {
+            const liquidityOrder = ['D+0', 'D+5', 'D+30', 'D+180', 'D+365', '>D+365'];
+            const sortedLiquidity = useMemo(() => {
+                if (!analysis || !analysis.liquidityAnalysis) return [];
+                return [...analysis.liquidityAnalysis].sort((a, b) => { // Create copy before sort
+                    return liquidityOrder.indexOf(a.name) - liquidityOrder.indexOf(b.name);
+                });
+            }, [analysis]);
+
+            return (
+                <PresentationSlide title="Análise de Liquidez da Carteira" pageNumber={pageNumber} totalPages={totalPages}>
+                    {!analysis || sortedLiquidity.length === 0 ? (
+                        <p className="text-slate-400">Dados de liquidez não disponíveis.</p>
+                    ) : (
+                        <table className="w-full text-left text-sm mt-4">
+                            <thead className="border-b border-slate-700">
+                                <tr>
+                                    <th className="py-2 pr-2 font-semibold text-slate-300">Prazo</th>
+                                    <th className="py-2 px-2 font-semibold text-slate-300 text-right">Valor Alocado</th>
+                                    <th className="py-2 pl-2 font-semibold text-slate-300 text-right">% da Carteira</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedLiquidity.map(bucket => (
+                                    <tr key={bucket.name} className="border-b border-slate-700/50 last:border-b-0">
+                                        <td className="py-2 pr-2 font-medium text-white">{bucket.name.replace('>', '')}</td>
+                                        <td className="py-2 px-2 text-slate-300 text-right font-semibold">{formatCurrency(bucket.value)}</td>
+                                        <td className="py-2 pl-2 text-slate-300 text-right font-semibold">{formatPercent(bucket.percentage)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot className="border-t-2 border-slate-600">
+                                <tr className="font-bold">
+                                     <td className="py-2 pr-2 text-white">TOTAL</td>
+                                     <td className="py-2 px-2 text-white text-right">{formatCurrency(analysis.totalValue)}</td>
+                                     <td className="py-2 pl-2 text-white text-right">100,00%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    )}
+                </PresentationSlide>
+            );
+        };
+
+        // NEW IssuerSlide Component
+        const IssuerSlide = ({ analysis, pageNumber, totalPages }) => (
+            <PresentationSlide title="Concentração por Emissor" pageNumber={pageNumber} totalPages={totalPages}>
+                {!analysis || !analysis.issuerChartData || analysis.issuerChartData.length === 0 ? (
+                    <p className="text-slate-400">Dados de emissores não disponíveis.</p>
+                ) : (
+                     // Using CssBarChart, ensuring data is passed correctly
+                    <CssBarChart data={analysis.issuerChartData} title="" /> // Title handled by slide
                 )}
             </PresentationSlide>
         );
 
 
+        // RedemptionSlide (Remains mostly the same)
         const RedemptionSlide = ({ redemptions, pageNumber, totalPages }) => {
             const redemptionList = Object.values(redemptions);
             const totalRedeemed = redemptionList.reduce((sum, { amount }) => sum + amount, 0);
@@ -3701,6 +3788,7 @@
             );
         };
 
+        // ApplicationSlide (Remains mostly the same)
         const ApplicationSlide = ({ applications, pageNumber, totalPages }) => {
             const applicationList = Object.entries(applications).flatMap(([institution, apps]) =>
                 apps.map(app => ({ ...app, institution }))
@@ -3743,6 +3831,7 @@
             );
         };
 
+        // QuotationSlide (Remains mostly the same)
         const QuotationSlide = ({ quotations, redemptions, applications, pageNumber, totalPages }) => {
             const quotationItems = Object.entries(quotations).map(([assetId, data]) => {
                 const redemption = Object.values(redemptions).find(r => `${r.asset.Instituição}-${r.asset["Número da Conta"] || 'N/A'}-${r.asset.Nome}-${r.asset.Valor}` === assetId);
@@ -3812,41 +3901,31 @@
         };
 
 
+        // ObservationsSlide (Remains the same, conditionally rendered)
         const ObservationsSlide = ({ observations, pageNumber, totalPages }) => (
             <PresentationSlide title="Observações" pageNumber={pageNumber} totalPages={totalPages}>
                 <div className="text-slate-300 text-sm whitespace-pre-wrap">{observations || 'Nenhuma observação adicionada.'}</div>
             </PresentationSlide>
         );
 
-        const DisclaimerSlide = ({ pageNumber, totalPages }) => (
-            <PresentationSlide title="Declarações Importantes" pageNumber={pageNumber} totalPages={totalPages}>
-                <div className="text-slate-400 text-xs space-y-2">
-                    <p>Este documento é uma simulação e sugestão de alocação de ativos, baseada nas informações fornecidas e no perfil de investidor (suitability) aplicável. Não constitui recomendação de investimento personalizada.</p>
-                    <p>Rentabilidade passada não garante rentabilidade futura. Investimentos envolvem riscos e podem resultar em perdas patrimoniais.</p>
-                    <p>Os ativos recomendados podem não ser adequados para todos os investidores. A decisão final de investimento é de exclusiva responsabilidade do cliente, que deve avaliar os riscos e objetivos antes de investir.</p>
-                    <p>As informações aqui contidas são confidenciais e destinadas exclusivamente ao cliente. É vedada a sua reprodução ou distribuição a terceiros sem prévia autorização.</p>
-                    <p>Consulte sempre seu assessor de investimentos para discutir quaisquer dúvidas e confirmar a adequação das sugestões à sua situação individual.</p>
-                </div>
-            </PresentationSlide>
-        );
-
-
-        // --- PresentationView Component (Corrected totalPages passing) ---
+        // --- PresentationView Component (Updated slide array and dependencies) ---
         function PresentationView({ client, profile, user, analysis, redemptions, applications, quotations, observations, onClose }) {
             const [currentSlide, setCurrentSlide] = useState(0);
 
-            // Define the slides to be included (Using useMemo as state/props might change)
+            // Updated slide array: Added IssuerSlide, removed DisclaimerSlide
             const slides = useMemo(() => [
                 <CoverSlide client={client} user={user} />,
-                <SummarySlide analysis={analysis} profile={profile} />,
-                <AllocationComparisonSlide analysis={analysis} profile={profile} />,
-                <LiquiditySlide analysis={analysis} />,
+                analysis && <SummarySlide analysis={analysis} profile={profile} />, // Only show if analysis exists
+                analysis && profile && <AllocationComparisonSlide analysis={analysis} profile={profile} />, // Only show if analysis & profile exist
+                analysis && analysis.liquidityAnalysis && <LiquiditySlide analysis={analysis} />, // Only show if liquidity data exists
+                analysis && analysis.issuerChartData && analysis.issuerChartData.length > 0 && <IssuerSlide analysis={analysis} />, // Add Issuer slide
                 (Object.keys(redemptions || {}).length > 0) && <RedemptionSlide redemptions={redemptions} />,
                 (Object.values(applications || {}).flat().length > 0) && <ApplicationSlide applications={applications} />,
-                (Object.keys(quotations || {}).length > 0 || Object.keys(redemptions || {}).length > 0) && <QuotationSlide quotations={quotations} redemptions={redemptions} applications={applications}/>,
+                // Show Quotation slide if there are redemptions OR applications (to show net cash)
+                (Object.keys(redemptions || {}).length > 0 || Object.values(applications || {}).flat().length > 0) && <QuotationSlide quotations={quotations} redemptions={redemptions} applications={applications}/>,
                 observations && <ObservationsSlide observations={observations} />,
-                <DisclaimerSlide />
-            ].filter(Boolean), [client, user, analysis, profile, redemptions, applications, quotations, observations]); // Dependencies for useMemo
+                // <DisclaimerSlide /> // Removed Disclaimer slide
+            ].filter(Boolean), [client, user, analysis, profile, redemptions, applications, quotations, observations]); // Updated dependencies
 
             const totalSlides = slides.length; // Calculate totalSlides AFTER filtering
 
@@ -3863,7 +3942,7 @@
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [totalSlides, onClose]); // Added onClose dependency
+            }, [totalSlides, onClose]);
 
             return (
                 <div className="fixed inset-0 bg-slate-900 z-40 flex flex-col p-4 md:p-8">
@@ -3873,6 +3952,7 @@
                             {client.name} - Apresentação
                         </div>
                         <div className="flex items-center space-x-4">
+                            {/* Ensured Print button exists */}
                             <button onClick={handlePrint} className="p-2 text-slate-300 hover:text-white" title="Imprimir / Salvar PDF"><Icon path={ICONS.PDF} /></button>
                             <span className="text-sm text-slate-400">Slide {currentSlide + 1} / {totalSlides}</span>
                             <button onClick={prevSlide} disabled={currentSlide === 0} className="p-2 text-slate-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"><Icon path={ICONS.CHEVRON_LEFT} /></button>
@@ -3889,7 +3969,7 @@
                                 className={`absolute inset-0 transition-opacity duration-300 ${currentSlide === index ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                             >
                                 {/* Pass page number and total pages to the actual Slide component */}
-                                {React.cloneElement(slide, { pageNumber: index + 1, totalPages: totalSlides })} {/* Pass totalPages here */}
+                                {React.cloneElement(slide, { pageNumber: index + 1, totalPages: totalSlides })}
                             </div>
                         ))}
                     </div>
@@ -3907,6 +3987,7 @@
 
         // --- Quotation View Component ---
         function QuotationView({ redemptions, quotations, setQuotations }) {
+             // ... (QuotationView logic remains the same) ...
             const redemptionItems = useMemo(() => {
                 return Object.entries(redemptions).map(([assetId, { asset, amount }]) => ({
                     id: assetId,
