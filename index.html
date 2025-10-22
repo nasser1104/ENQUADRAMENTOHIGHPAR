@@ -54,8 +54,12 @@
             display: none;
         }
 
-        /* NEW AND IMPROVED PRINT STYLES */
+        /* UPDATED PRINT STYLES for proper page breaks */
         @media print {
+            @page {
+                size: landscape;
+                margin: 0;
+            }
             body, html {
                 background-color: #fff !important;
                 -webkit-print-color-adjust: exact !important;
@@ -77,10 +81,11 @@
             }
             .presentation-slide {
                 width: 100% !important;
-                height: 100vh !important;
+                height: 100% !important;
                 page-break-after: always !important;
+                page-break-inside: avoid !important;
                 display: flex !important;
-                flex-direction: column !important;
+                flex-direction: column !importanT;
                 visibility: visible !important;
                 opacity: 1 !important;
                 position: relative !important;
@@ -89,8 +94,12 @@
                 background: #fff !important;
                 color: #0f172a !important; /* slate-900 */
                 overflow: hidden !important; /* Hide overflow in print */
-                padding: 2.5rem !important;
+                padding: 1.5rem !important; /* Reduced padding for print */
             }
+            .presentation-slide:last-child {
+                page-break-after: auto !important;
+            }
+
             .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
                 color: #0f172a !important;
             }
@@ -110,7 +119,7 @@
             .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
             .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
             .presentation-slide table {
-                 page-break-inside: avoid !important;
+                page-break-inside: avoid !important;
             }
             .slide-content-print {
                 flex-grow: 1;
@@ -124,14 +133,14 @@
                 align-items: center;
                 border-bottom: 1px solid #cbd5e1;
                 padding-bottom: 1rem;
-                margin-bottom: 1rem; /* Reduced margin */
+                margin-bottom: 1rem;
                 flex-shrink: 0;
             }
             .slide-footer-print {
                 text-align: center;
                 border-top: 1px solid #cbd5e1;
                 padding-top: 0.75rem;
-                margin-top: 1rem; /* Reduced margin */
+                margin-top: 1rem;
                 font-size: 9px;
                 color: #475569;
                 flex-shrink: 0;
@@ -196,7 +205,7 @@
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
         };
         const formatPercent = (value) => {
-             const num = parseFloat(value);
+            const num = parseFloat(value);
             if (isNaN(num)) return "0,00%";
             return `${(num * 100).toFixed(2).replace('.',',')}%`;
         }
@@ -252,52 +261,52 @@
             const [page, setPage] = useState('dashboard'); 
             const [selectedClientId, setSelectedClientId] = useState(null);
 
-             useEffect(() => {
-                  let unsubscribeUserDoc = () => {};
-                  const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
-                        unsubscribeUserDoc();
+            useEffect(() => {
+                let unsubscribeUserDoc = () => {};
+                const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+                    unsubscribeUserDoc();
 
-                        if (currentUser) {
-                            const userDocRef = db.collection("users").doc(currentUser.uid);
-                            unsubscribeUserDoc = userDocRef.onSnapshot(async (doc) => {
-                                if (doc.exists) {
+                    if (currentUser) {
+                        const userDocRef = db.collection("users").doc(currentUser.uid);
+                        unsubscribeUserDoc = userDocRef.onSnapshot(async (doc) => {
+                            if (doc.exists) {
+                                setUser(currentUser);
+                                setUserData({ uid: currentUser.uid, ...doc.data() });
+                                setLoading(false);
+                            } else {
+                                try {
+                                    const role = currentUser.email.toLowerCase().includes('admin') ? 'admin' : 'consultant';
+                                    const name = currentUser.displayName || currentUser.email.split('@')[0];
+                                    await userDocRef.set({
+                                        name: name,
+                                        email: currentUser.email,
+                                        role: role,
+                                    });
+                                } catch (error) {
+                                    console.error("Failed to auto-create user document:", error);
                                     setUser(currentUser);
-                                    setUserData({ uid: currentUser.uid, ...doc.data() });
+                                    setUserData(null);
                                     setLoading(false);
-                                } else {
-                                    try {
-                                        const role = currentUser.email.toLowerCase().includes('admin') ? 'admin' : 'consultant';
-                                        const name = currentUser.displayName || currentUser.email.split('@')[0];
-                                        await userDocRef.set({
-                                            name: name,
-                                            email: currentUser.email,
-                                            role: role,
-                                        });
-                                    } catch (error) {
-                                        console.error("Failed to auto-create user document:", error);
-                                        setUser(currentUser);
-                                        setUserData(null);
-                                        setLoading(false);
-                                    }
                                 }
-                            }, (error) => {
-                                 console.error("Error fetching user data snapshot:", error);
-                                 setUser(currentUser);
-                                 setUserData(null);
-                                 setLoading(false);
-                            });
-                        } else {
-                            setUser(null);
-                            setUserData(null);
-                            setLoading(false);
-                        }
-                  });
+                            }
+                        }, (error) => {
+                             console.error("Error fetching user data snapshot:", error);
+                             setUser(currentUser);
+                             setUserData(null);
+                             setLoading(false);
+                        });
+                    } else {
+                        setUser(null);
+                        setUserData(null);
+                        setLoading(false);
+                    }
+                });
 
-                  return () => {
-                        unsubscribeAuth();
-                        unsubscribeUserDoc();
-                  };
-             }, []);
+                return () => {
+                    unsubscribeAuth();
+                    unsubscribeUserDoc();
+                };
+            }, []);
             
             const handleSignOut = () => {
                 auth.signOut();
@@ -315,7 +324,7 @@
             
             if (user && !userData) {
                  return (
-                       <div className="h-screen w-full flex flex-col items-center justify-center text-center p-8 bg-slate-900 text-white">
+                        <div className="h-screen w-full flex flex-col items-center justify-center text-center p-8 bg-slate-900 text-white">
                             <h1 className="text-2xl text-red-400 font-bold mb-4">Erro de Perfil</h1>
                             <p className="text-slate-400 mb-6 max-w-md">Não foi possível carregar ou criar os dados do seu perfil. Verifique as regras de segurança do Firebase e tente novamente.</p>
                             <button 
@@ -324,7 +333,7 @@
                             >
                                 Sair
                             </button>
-                       </div>
+                        </div>
                  );
             }
             
@@ -853,11 +862,8 @@
                     await db.collection("clients").doc(client.id).update({
                         observations: observations
                     });
-                    // Simple feedback, can be improved with a toast notification
-                    alert("Observações salvas com sucesso!");
                 } catch (error) {
                     console.error("Error saving observations:", error);
-                    alert("Erro ao salvar as observações.");
                 }
             };
 
@@ -1247,6 +1253,8 @@
                             <p className="text-2xl font-bold text-white">{formatCurrency(totalValue)}</p>
                         </div>
                     </div>
+                    
+                    <LiquidityAnalysisView portfolio={analysis.portfolio} />
 
                     <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
                        <GroupedAssetTable data={groupedData || []} totalValue={totalValue} title={viewType === 'estrategia' ? 'Classe / Subclasse' : 'Tipo de Ativo'} />
@@ -1254,6 +1262,72 @@
                 </div>
             );
         }
+
+        const LiquidityAnalysisView = ({ portfolio }) => {
+            const liquidityData = useMemo(() => {
+                if (!portfolio || portfolio.length === 0) return null;
+        
+                const buckets = {
+                    'D+0': { label: 'Hoje (D+0)', value: 0 },
+                    'D+5': { label: 'Até 5 dias', value: 0 },
+                    'D+30': { label: 'Até 30 dias', value: 0 },
+                    'D+180': { label: 'Até 180 dias', value: 0 },
+                    'D+365': { label: 'Até 365 dias', value: 0 },
+                    'D>365': { label: 'Acima de 365 dias', value: 0 },
+                };
+        
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+        
+                portfolio.forEach(asset => {
+                    let targetBucket = 'D+5'; // Default
+        
+                    if (asset.Vencimento) {
+                        let vencimentoDate;
+                        // Handle multiple date formats
+                        if (asset.Vencimento && typeof asset.Vencimento.seconds === 'number') {
+                            vencimentoDate = new Date(asset.Vencimento.seconds * 1000);
+                        } else if (typeof asset.Vencimento === 'string') {
+                            vencimentoDate = new Date(asset.Vencimento + 'T00:00:00');
+                        } else if (asset.Vencimento instanceof Date) {
+                           vencimentoDate = asset.Vencimento;
+                        }
+        
+                        if (vencimentoDate && !isNaN(vencimentoDate.getTime())) {
+                            const diffTime = vencimentoDate - today;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+                            if (diffDays <= 0) targetBucket = 'D+0';
+                            else if (diffDays <= 5) targetBucket = 'D+5';
+                            else if (diffDays <= 30) targetBucket = 'D+30';
+                            else if (diffDays <= 180) targetBucket = 'D+180';
+                            else if (diffDays <= 365) targetBucket = 'D+365';
+                            else targetBucket = 'D>365';
+                        }
+                    }
+        
+                    buckets[targetBucket].value += asset.Valor;
+                });
+        
+                return Object.values(buckets);
+            }, [portfolio]);
+        
+            if (!liquidityData) return null;
+        
+            return (
+                <div className="bg-slate-800 rounded-xl shadow-lg p-6">
+                    <h3 className="text-xl font-semibold text-white mb-4">Análise de Liquidez da Carteira</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
+                        {liquidityData.map(bucket => (
+                            <div key={bucket.label} className="bg-slate-700/50 p-4 rounded-lg">
+                                <p className="text-sm font-semibold text-sky-400">{bucket.label}</p>
+                                <p className="text-lg font-bold text-white mt-1">{formatCurrency(bucket.value)}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
         
         const FlatAssetTable = ({ portfolio }) => (
             <table className="w-full text-left">
@@ -1474,7 +1548,7 @@
                         diffValue: current.value - recommended.value,
                     };
                 }).sort((a,b) => b.recommendedValue - a.recommendedValue)
-                  .filter(item => item.recommendedPercent > 0 || item.currentPercent > 0);
+                .filter(item => item.recommendedPercent > 0 || item.currentPercent > 0);
                 
                 const institutionalData = analysis.portfolio.reduce((acc, asset) => {
                     const account = asset.Instituição + (asset["Número da Conta"] ? ` - ${asset["Número da Conta"]}` : '');
@@ -1788,18 +1862,18 @@
                         <div className="space-y-4">
                             <h3 className="text-xl font-semibold text-green-400 border-b border-slate-700 pb-2">Sugestões de Aplicação</h3>
                              {Object.entries(movements.toApply).map(([assetClass, amount]) => {
-                                const appliedSoFar = totalAppliedPerClass[assetClass] || 0;
-                                const remainingToApply = amount - appliedSoFar;
+                                 const appliedSoFar = totalAppliedPerClass[assetClass] || 0;
+                                 const remainingToApply = amount - appliedSoFar;
 
-                                if (remainingToApply <= 1) return null;
+                                 if (remainingToApply <= 1) return null;
 
-                                return (
-                                 <div key={assetClass} className="bg-slate-700/50 p-3 rounded-lg">
-                                     <div className="flex justify-between items-center mb-2">
-                                         <h4 className="font-semibold text-white">{assetClass}</h4>
-                                         <span className="text-sm text-green-400 font-bold">Falta Aplicar ~{formatCurrency(remainingToApply)}</span>
-                                     </div>
-                                     {(applications[institution] || []).filter(app => app.Classe === assetClass).map((app, index) => (
+                                 return (
+                                  <div key={assetClass} className="bg-slate-700/50 p-3 rounded-lg">
+                                      <div className="flex justify-between items-center mb-2">
+                                          <h4 className="font-semibold text-white">{assetClass}</h4>
+                                          <span className="text-sm text-green-400 font-bold">Falta Aplicar ~{formatCurrency(remainingToApply)}</span>
+                                      </div>
+                                      {(applications[institution] || []).filter(app => app.Classe === assetClass).map((app, index) => (
                                          <div key={index} className="flex items-center justify-between bg-slate-600/50 p-2 rounded mb-2">
                                              <div>
                                                  <p className="text-sm font-semibold">{app.name}</p>
@@ -1807,16 +1881,16 @@
                                              </div>
                                              <button onClick={() => handleDeleteApplication(institution, index)} className="text-red-400 hover:text-red-300"><Icon path={ICONS.TRASH} className="h-4 w-4" /></button>
                                          </div>
-                                     ))}
-                                     <AddApplicationForm 
-                                         assetClass={assetClass} 
-                                         institution={institution}
-                                         availableCash={availableCash}
-                                         onAddApplication={onAddApplication}
-                                         recommendedAssets={recommendedAssets}
-                                     />
-                                 </div>
-                                )
+                                      ))}
+                                      <AddApplicationForm 
+                                          assetClass={assetClass} 
+                                          institution={institution}
+                                          availableCash={availableCash}
+                                          onAddApplication={onAddApplication}
+                                          recommendedAssets={recommendedAssets}
+                                      />
+                                  </div>
+                                 )
                              })}
                         </div>
                     </div>
@@ -1889,22 +1963,22 @@
 
                         {selectedAsset === 'custom' && (
                              <input 
-                                type="text" 
-                                placeholder="Nome do Ativo Personalizado" 
-                                value={customAssetName}
-                                onChange={e => setCustomAssetName(e.target.value)}
-                                className="w-full px-3 py-1 bg-slate-600 border border-slate-500 rounded-lg text-white text-sm"
-                            />
+                                 type="text" 
+                                 placeholder="Nome do Ativo Personalizado" 
+                                 value={customAssetName}
+                                 onChange={e => setCustomAssetName(e.target.value)}
+                                 className="w-full px-3 py-1 bg-slate-600 border border-slate-500 rounded-lg text-white text-sm"
+                             />
                         )}
 
                         <div className="flex space-x-2">
                            <input 
-                                type="text"
-                                placeholder="R$ 0,00" 
-                                value={value}
-                                onChange={handleValueChange}
-                                className="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded-lg text-white text-sm text-right"
-                            />
+                               type="text"
+                               placeholder="R$ 0,00" 
+                               value={value}
+                               onChange={handleValueChange}
+                               className="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded-lg text-white text-sm text-right"
+                           />
                            <button type="submit" className="p-2 bg-sky-600 rounded-lg hover:bg-sky-500"><Icon path={ICONS.PLUS} className="h-4 w-4"/></button>
                         </div>
                     </div>
@@ -2119,8 +2193,8 @@
             const removeSubcategory = (classId, subIndex) => {
                 const newAllocations = allocations.map(alloc => {
                     if (alloc.id === classId) {
-                      const newSubcategories = alloc.subcategories.filter((_, i) => i !== subIndex);
-                      return {...alloc, subcategories: newSubcategories};
+                       const newSubcategories = alloc.subcategories.filter((_, i) => i !== subIndex);
+                       return {...alloc, subcategories: newSubcategories};
                     }
                     return alloc;
                 });
@@ -2481,20 +2555,20 @@
 
             return (
                 <div>
-                     <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
+                    <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold text-slate-300">Gerenciar Classes e Subclasses</h2>
                         <div className="flex items-center space-x-4">
-                             <button onClick={handleSeedData} disabled={seeding || classes.length > 0} className="flex items-center bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-800 disabled:cursor-not-allowed">
-                                 {seeding ? <Loader className="h-5 w-5 mr-2" /> : null}
-                                 Pré-cadastrar Classes
-                             </button>
-                             <button onClick={() => { setEditingClass(null); setIsModalOpen(true); }} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
-                                 <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
-                                 Nova Classe
-                             </button>
+                            <button onClick={handleSeedData} disabled={seeding || classes.length > 0} className="flex items-center bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-800 disabled:cursor-not-allowed">
+                                {seeding ? <Loader className="h-5 w-5 mr-2" /> : null}
+                                Pré-cadastrar Classes
+                            </button>
+                            <button onClick={() => { setEditingClass(null); setIsModalOpen(true); }} className="flex items-center bg-sky-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors">
+                                <Icon path={ICONS.PLUS} className="h-5 w-5 mr-2" />
+                                Nova Classe
+                            </button>
                         </div>
                     </div>
-                     <div className="bg-slate-800 rounded-xl shadow-lg">
+                    <div className="bg-slate-800 rounded-xl shadow-lg">
                         <table className="w-full text-left">
                             <thead className="border-b border-slate-700">
                                 <tr>
@@ -2505,7 +2579,7 @@
                             </thead>
                             <tbody>
                                 {loading ? (
-                                     <tr><td colSpan="3" className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></td></tr>
+                                    <tr><td colSpan="3" className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></td></tr>
                                 ) : classes.map(c => (
                                     <tr key={c.id} className="border-b border-slate-700 last:border-b-0">
                                         <td className="p-4 font-bold text-white w-1/4">{c.name}</td>
@@ -2577,8 +2651,8 @@
                     <div className="bg-slate-800 rounded-xl shadow-2xl p-8 w-full max-w-lg">
                         <h2 className="text-2xl font-bold text-white mb-6">{assetClass ? 'Editar Classe' : 'Nova Classe de Ativo'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                             <input type="text" placeholder="Nome da Classe" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
-                            <div>
+                            <input type="text" placeholder="Nome da Classe" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white" required />
+                           <div>
                                 <h3 className="text-lg font-semibold text-white mb-2">Subclasses</h3>
                                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                     {subclasses.map((sub, index) => (
@@ -2627,15 +2701,24 @@
                 const configs = [
                     { Component: TitleSlide, props: { client, user }, title: "Capa" },
                     { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
+                    { Component: LiquidityAnalysisSlide, props: { portfolio: analysis?.portfolio }, title: "Análise de Liquidez" },
                     { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
                     { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
                     { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
-                    { Component: ObservationsSlide, props: { observations }, title: "Observações e Estratégia"},
-                    { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
                 ];
+                
+                if (observations && observations.trim() !== '') {
+                    configs.push({ Component: ObservationsSlide, props: { observations }, title: "Observações e Estratégia"});
+                }
 
-                if (Object.keys(redemptions).length > 0 || Object.keys(applications).length > 0) {
-                     configs.push({ Component: ProjectedPortfolioSlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada" });
+                if (Object.keys(redemptions).length > 0 || Object.keys(applications).flat().length > 0) {
+                     configs.push({ Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" });
+                     configs.push({ Component: ActionPlanTimelineSlide, props: { redemptions }, title: "Cronograma do Plano" });
+                }
+
+                if (Object.keys(redemptions).length > 0 || Object.values(applications).flat().length > 0) {
+                    configs.push({ Component: ProjectedPortfolioSummarySlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Resumo)" });
+                    configs.push({ Component: ProjectedPortfolioDetailSlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Detalhes)" });
                 }
 
                 if (Object.keys(redemptions).length > 0) {
@@ -2673,7 +2756,7 @@
                                     className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
                                 >
                                     <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center">
-                                        <Component {...props} />
+                                        <Component {...props} isPrint={false} />
                                     </div>
                                 </div>
                            ))}
@@ -2683,16 +2766,16 @@
                     {/* Print UI: All slides rendered sequentially */}
                     <div className="printable-content">
                         {slideConfigs.map(({ Component, props, title }, index) => {
-                           const slideInfo = { current: index + 1, total: slideConfigs.length };
-                           return (
-                               <div key={`print-${index}`} className="presentation-slide">
-                                   {index > 0 && <SlideHeader title={title} />}
-                                   <div className="slide-content-print">
-                                       <Component {...props} />
-                                   </div>
-                                   {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideConfigs.length} />}
-                               </div>
-                           );
+                            const slideInfo = { current: index + 1, total: slideConfigs.length };
+                            return (
+                                <div key={`print-${index}`} className="presentation-slide">
+                                    {index > 0 && <SlideHeader title={title} />}
+                                    <div className="slide-content-print">
+                                        <Component {...props} isPrint={true} />
+                                    </div>
+                                    {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideConfigs.length} />}
+                                </div>
+                            );
                         })}
                     </div>
                 </div>
@@ -2902,8 +2985,8 @@
                          <div className="bg-slate-800 p-6 rounded-xl flex flex-col">
                             <h3 className="text-xl font-semibold text-green-400 mb-4">Aplicações Sugeridas</h3>
                              <div className="space-y-3 flex-grow overflow-y-auto">
-                               {Object.values(applications).flat().length > 0 ? Object.entries(applications).map(([inst, apps]) => (
-                                   <div key={inst}>
+                                {Object.values(applications).flat().length > 0 ? Object.entries(applications).map(([inst, apps]) => (
+                                    <div key={inst}>
                                      <h4 className="font-bold text-slate-300 text-sm mb-1">{inst}</h4>
                                      {apps.map((app, i) => (
                                          <div key={i} className="flex justify-between items-center text-sm p-2 bg-slate-700/50 rounded mb-2">
@@ -2911,8 +2994,8 @@
                                              <p className="font-bold text-green-400">{formatCurrency(app.value)}</p>
                                          </div>
                                      ))}
-                                   </div>
-                               )) : <p className="text-slate-400 text-sm">Nenhuma aplicação necessária.</p>}
+                                    </div>
+                                )) : <p className="text-slate-400 text-sm">Nenhuma aplicação necessária.</p>}
                             </div>
                              <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between font-bold flex-shrink-0">
                                 <span>Total a Aplicar:</span>
@@ -2924,208 +3007,145 @@
             )
         };
 
-        const ProjectedPortfolioSlide = ({ analysis, redemptions, applications }) => {
+        const ProjectedPortfolioSummarySlide = ({ analysis, redemptions, applications }) => {
             const projectedAnalysis = useMemo(() => {
                 if (!analysis) return null;
-
-                // 1. Start with original portfolio
+        
                 let projectedPortfolio = JSON.parse(JSON.stringify(analysis.portfolio));
-
-                // 2. Apply redemptions
+        
                 const redemptionMap = {};
                 Object.values(redemptions).forEach(({ asset, amount }) => {
                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
                     redemptionMap[assetId] = (redemptionMap[assetId] || 0) + amount;
                 });
-
+        
                 projectedPortfolio = projectedPortfolio.map(asset => {
                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
                     if (redemptionMap[assetId]) {
                         asset.Valor -= redemptionMap[assetId];
                     }
                     return asset;
-                }).filter(asset => asset.Valor > 0.01); // Filter out assets that were fully redeemed
-
-                // 3. Apply applications
+                }).filter(asset => asset.Valor > 0.01);
+        
                 Object.entries(applications).forEach(([institution, apps]) => {
                     apps.forEach(app => {
                         const [inst, conta] = institution.split(' - ');
                         projectedPortfolio.push({
-                            "Instituição": inst,
-                            "Número da Conta": conta || '',
-                            "Nome": app.name,
-                            "Valor": app.value,
-                            "Classe": app.Classe.split(' - ')[0],
-                            "Subclasse": app.Classe.split(' - ')[1] || '',
-                            "Emissor": '',
-                            "Vencimento": '',
-                            "Taxa": '',
-                            "Liquidez": '',
-                            "Tipo de Ativo": 'Novo Ativo', // Placeholder
+                            "Instituição": inst, "Número da Conta": conta || '', "Nome": app.name, "Valor": app.value,
+                            "Classe": app.Classe.split(' - ')[0], "Subclasse": app.Classe.split(' - ')[1] || '',
+                            "Emissor": '', "Vencimento": '', "Taxa": '', "Liquidez": '', "Tipo de Ativo": 'Novo Ativo',
                         });
                     });
                 });
-
-                if (projectedPortfolio.length === 0) return { totalValue: 0, chartData: [], portfolio: [] };
-
+        
+                if (projectedPortfolio.length === 0) return { totalValue: 0, classData: [], institutionData: [] };
+        
                 const newTotalValue = projectedPortfolio.reduce((sum, asset) => sum + asset.Valor, 0);
-
+        
                 const newAllocationByClass = projectedPortfolio.reduce((acc, asset) => {
                     const key = asset.Classe;
                     if (!acc[key]) acc[key] = { name: key, value: 0 };
                     acc[key].value += asset.Valor;
                     return acc;
                 }, {});
-
+        
+                const newAllocationByInstitution = projectedPortfolio.reduce((acc, asset) => {
+                     const account = asset.Instituição + (asset["Número da Conta"] ? ` - ${asset["Número da Conta"]}` : '');
+                    if (!acc[account]) acc[account] = { name: account, value: 0 };
+                    acc[account].value += asset.Valor;
+                    return acc;
+                }, {});
+        
                 return {
                     totalValue: newTotalValue,
-                    chartData: Object.values(newAllocationByClass),
-                    portfolio: projectedPortfolio,
+                    classData: Object.values(newAllocationByClass).sort((a,b) => b.value - a.value),
+                    institutionData: Object.values(newAllocationByInstitution).sort((a,b) => b.value - a.value),
                 };
             }, [analysis, redemptions, applications]);
-
-            if (!projectedAnalysis) {
-                return <p className="text-slate-400">Não foi possível projetar a nova carteira.</p>;
-            }
-
+        
+            if (!projectedAnalysis) return null;
+        
             return (
                 <div className="grid grid-cols-2 gap-8 h-full">
-                    <div className="flex flex-col">
-                         <h3 className="text-2xl font-bold text-white mb-4">Carteira Projetada</h3>
-                         <p className="text-slate-400 mb-4">Valor Total: <span className="font-bold text-white">{formatCurrency(projectedAnalysis.totalValue)}</span></p>
-                         <div className="flex-grow">
-                            <SvgPieChart data={projectedAnalysis.chartData} title="Nova Distribuição por Estratégia" />
-                         </div>
-                    </div>
-                    <div className="bg-slate-800 p-4 rounded-xl flex flex-col">
-                         <h4 className="text-xl font-semibold text-white mb-4">Novos Ativos da Carteira</h4>
-                         <div className="flex-grow overflow-y-auto">
-                            <table className="w-full text-left">
-                                <thead className="sticky top-0 bg-slate-800">
-                                    <tr className="border-b border-slate-700">
-                                        <th className="p-2 text-sm text-slate-300">Ativo</th>
-                                        <th className="p-2 text-sm text-slate-300 text-right">Valor</th>
-                                        <th className="p-2 text-sm text-slate-300 text-right">%</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {projectedAnalysis.portfolio.sort((a,b) => b.Valor - a.Valor).map((asset, i) => (
-                                        <tr key={i} className="border-b border-slate-700/50">
-                                            <td className="p-2 text-sm">
-                                                <p className="font-medium text-white truncate" title={asset.Nome}>{asset.Nome}</p>
-                                                <p className="text-xs text-slate-400">{asset.Instituição}</p>
-                                            </td>
-                                            <td className="p-2 text-sm text-slate-300 text-right">{formatCurrency(asset.Valor)}</td>
-                                            <td className="p-2 text-sm text-white font-semibold text-right">{formatPercent(asset.Valor / projectedAnalysis.totalValue)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                         </div>
+                    <SvgPieChart data={projectedAnalysis.classData} title="Nova Distribuição por Estratégia" />
+                    <div className="space-y-8">
+                        <CssBarChart data={projectedAnalysis.classData} title="Valor Financeiro por Classe" />
+                        <CssBarChart data={projectedAnalysis.institutionData} title="Valor Financeiro por Instituição" />
                     </div>
                 </div>
             );
         };
         
-        // --- NEW COMPONENTS ---
-        function IssuerView({ analysis }) {
-            const issuerData = useMemo(() => {
-                if (!analysis || !analysis.issuerConcentration) return null;
-                const sorted = Object.entries(analysis.issuerConcentration)
-                    .map(([name, value]) => ({ name, value }))
-                    .sort((a, b) => b.value - a.value);
-                return {
-                    chartData: sorted,
-                    totalValue: analysis.totalValue
-                };
-            }, [analysis]);
-
-            if (!issuerData) {
-                return <div className="text-center p-10 bg-slate-800 rounded-lg"><h3 className="text-lg text-slate-400">Nenhum emissor identificado no portfólio.</h3></div>;
-            }
-
-            return (
-                <div className="space-y-6">
-                    <CssBarChart data={issuerData.chartData} title="Concentração por Emissor" />
-                </div>
-            )
-        }
+        const ProjectedPortfolioDetailSlide = ({ analysis, redemptions, applications }) => {
+            const projectedPortfolio = useMemo(() => {
+                 if (!analysis) return null;
         
-        function QuotationView({ redemptions, quotations, setQuotations }) {
-            const handleQuoteChange = (assetId, value) => {
-                const numericValue = parseFloat(String(value).replace(/\D/g, '')) / 100;
-                setQuotations(prev => ({
-                    ...prev,
-                    [assetId]: isNaN(numericValue) ? 0 : numericValue
-                }));
-            };
-
-            const redemptionList = Object.values(redemptions).map(r => r.asset);
-            const totals = useMemo(() => {
-                let totalTela = 0, totalResgate = 0;
-                Object.values(redemptions).forEach(({asset, amount}) => {
-                     const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                     totalTela += amount;
-                     totalResgate += (quotations[assetId] || 0);
+                let portfolio = JSON.parse(JSON.stringify(analysis.portfolio));
+        
+                const redemptionMap = {};
+                Object.values(redemptions).forEach(({ asset, amount }) => {
+                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                    redemptionMap[assetId] = (redemptionMap[assetId] || 0) + amount;
                 });
-                const totalDesagio = totalTela - totalResgate;
-                const totalDesagioPercent = totalTela > 0 ? totalDesagio / totalTela : 0;
-                return { totalTela, totalResgate, totalDesagio, totalDesagioPercent };
-            }, [redemptions, quotations]);
+        
+                portfolio = portfolio.map(asset => {
+                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
+                    if (redemptionMap[assetId]) {
+                        asset.Valor -= redemptionMap[assetId];
+                    }
+                    return asset;
+                }).filter(asset => asset.Valor > 0.01);
+        
+                Object.entries(applications).forEach(([institution, apps]) => {
+                    apps.forEach(app => {
+                        const [inst, conta] = institution.split(' - ');
+                        portfolio.push({
+                            "Instituição": inst, "Número da Conta": conta || '', "Nome": app.name, "Valor": app.value,
+                            "Classe": app.Classe.split(' - ')[0], "Subclasse": app.Classe.split(' - ')[1] || '',
+                            "Emissor": '', "Vencimento": '', "Taxa": '', "Liquidez": '', "Tipo de Ativo": 'Novo Ativo',
+                        });
+                    });
+                });
+
+                return portfolio.reduce((acc, asset) => {
+                    const key = asset.Classe;
+                    if(!acc[key]) acc[key] = [];
+                    acc[key].push(asset);
+                    return acc;
+                }, {});
+
+            }, [analysis, redemptions, applications]);
+
+            if(!projectedPortfolio) return null;
 
             return (
-                <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
-                    <h3 className="text-xl font-semibold text-white p-4">Cotação de Ativos para Resgate</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="border-b border-slate-700">
-                                <tr>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Ativo</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Valor de Tela</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Valor de Resgate</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Deságio (R$)</th>
-                                    <th className="p-4 text-sm font-semibold text-slate-300">Deságio (%)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Object.values(redemptions).map(({ asset, amount }, index) => {
-                                    const assetId = `${asset.Instituição}-${asset["Número da Conta"] || ''}-${asset.Nome}-${asset.Valor}`;
-                                    const valorTela = amount;
-                                    const valorResgate = quotations[assetId] || 0;
-                                    const desagioValor = valorTela - valorResgate;
-                                    const desagioPercent = valorTela > 0 ? (desagioValor / valorTela) : 0;
-                                    return (
-                                        <tr key={assetId} className="border-b border-slate-700 last:border-b-0">
-                                            <td className="p-4 font-medium text-white">{asset.Nome}<p className="text-xs text-slate-400">{asset.Instituição}</p></td>
-                                            <td className="p-4 text-slate-300">{formatCurrency(valorTela)}</td>
-                                            <td className="p-4">
-                                                <input 
-                                                    type="text"
-                                                    value={formatCurrency(valorResgate).replace('R$\u00A0', '')}
-                                                    onChange={(e) => handleQuoteChange(assetId, e.target.value)}
-                                                    className="w-36 px-2 py-1 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-right focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                                                />
-                                            </td>
-                                            <td className="p-4 text-red-400">{formatCurrency(desagioValor)}</td>
-                                            <td className="p-4 text-red-400">{formatPercent(desagioPercent)}</td>
+                <div className="h-full overflow-y-auto">
+                    {Object.entries(projectedPortfolio).map(([className, assets]) => (
+                        <div key={className} className="mb-6">
+                            <h4 className="text-xl font-bold text-white mb-2 pb-2 border-b-2 border-sky-500">{className}</h4>
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr>
+                                        <th className="p-2 text-sm text-slate-300">Ativo</th>
+                                        <th className="p-2 text-sm text-slate-300">Instituição</th>
+                                        <th className="p-2 text-sm text-slate-300 text-right">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {assets.sort((a,b) => b.Valor - a.Valor).map((asset, i) => (
+                                        <tr key={i} className="border-b border-slate-700/50">
+                                            <td className="p-2 text-sm text-white">{asset.Nome}</td>
+                                            <td className="p-2 text-sm text-slate-400">{asset.Instituição}</td>
+                                            <td className="p-2 text-sm text-slate-200 font-semibold text-right">{formatCurrency(asset.Valor)}</td>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                            <tfoot className="border-t-2 border-slate-600 bg-slate-900/50">
-                                <tr className="font-bold">
-                                    <td className="p-4 text-white">TOTAIS</td>
-                                    <td className="p-4 text-slate-200">{formatCurrency(totals.totalTela)}</td>
-                                    <td className="p-4 text-slate-200">{formatCurrency(totals.totalResgate)}</td>
-                                    <td className="p-4 text-red-300">{formatCurrency(totals.totalDesagio)}</td>
-                                    <td className="p-4 text-red-300">{formatPercent(totals.totalDesagioPercent)}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ))}
                 </div>
             );
-        }
+        };
         
         const IssuerConcentrationSlide = ({ analysis }) => {
             const issuerData = useMemo(() => {
@@ -3220,6 +3240,112 @@
                 </div>
             );
         };
+
+        const LiquidityAnalysisSlide = ({ portfolio, isPrint }) => {
+             const liquidityData = useMemo(() => {
+                if (!portfolio || portfolio.length === 0) return null;
+        
+                const buckets = {
+                    'D+0': { label: 'Hoje (D+0)', value: 0 },
+                    'D+5': { label: 'Até 5 dias', value: 0 },
+                    'D+30': { label: 'Até 30 dias', value: 0 },
+                    'D+180': { label: 'Até 180 dias', value: 0 },
+                    'D+365': { label: 'Até 365 dias', value: 0 },
+                    'D>365': { label: 'Acima de 365 dias', value: 0 },
+                };
+        
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+        
+                portfolio.forEach(asset => {
+                    let targetBucket = 'D+5'; // Default
+        
+                    if (asset.Vencimento) {
+                        let vencimentoDate;
+                        if (asset.Vencimento && typeof asset.Vencimento.seconds === 'number') {
+                            vencimentoDate = new Date(asset.Vencimento.seconds * 1000);
+                        } else if (typeof asset.Vencimento === 'string') {
+                            vencimentoDate = new Date(asset.Vencimento + 'T00:00:00');
+                        } else if (asset.Vencimento instanceof Date) {
+                           vencimentoDate = asset.Vencimento;
+                        }
+        
+                        if (vencimentoDate && !isNaN(vencimentoDate.getTime())) {
+                            const diffTime = vencimentoDate - today;
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+                            if (diffDays <= 0) targetBucket = 'D+0';
+                            else if (diffDays <= 5) targetBucket = 'D+5';
+                            else if (diffDays <= 30) targetBucket = 'D+30';
+                            else if (diffDays <= 180) targetBucket = 'D+180';
+                            else if (diffDays <= 365) targetBucket = 'D+365';
+                            else targetBucket = 'D>365';
+                        }
+                    }
+        
+                    buckets[targetBucket].value += asset.Valor;
+                });
+        
+                return Object.values(buckets);
+            }, [portfolio]);
+
+            if(!liquidityData) return null;
+
+            const gridClass = isPrint ? "grid-cols-6" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-6";
+
+            return (
+                 <div className="bg-slate-800 rounded-xl shadow-lg p-6">
+                    <div className={`grid ${gridClass} gap-4 text-center`}>
+                        {liquidityData.map(bucket => (
+                            <div key={bucket.label} className="bg-slate-700/50 p-4 rounded-lg">
+                                <p className="text-sm font-semibold text-sky-400">{bucket.label}</p>
+                                <p className="text-lg font-bold text-white mt-1">{formatCurrency(bucket.value)}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        }
+
+        const ActionPlanTimelineSlide = ({ redemptions }) => {
+            const timelineData = useMemo(() => {
+                if(!redemptions || Object.keys(redemptions).length === 0) return null;
+
+                const parseLiquidityDays = (liquidityString) => {
+                    if (!liquidityString || typeof liquidityString !== 'string') return 2; // Default
+                    const match = liquidityString.match(/\d+/);
+                    return match ? parseInt(match[0], 10) : 2;
+                };
+
+                const buckets = {};
+                Object.values(redemptions).forEach(({ asset, amount }) => {
+                    const days = parseLiquidityDays(asset.Liquidez);
+                    if(!buckets[days]) buckets[days] = 0;
+                    buckets[days] += amount;
+                });
+                
+                return Object.entries(buckets)
+                    .map(([days, value]) => ({days: Number(days), value}))
+                    .sort((a, b) => a.days - b.days);
+
+            }, [redemptions]);
+
+            if(!timelineData) return <p className="text-slate-400">Nenhum cronograma de resgate definido.</p>;
+
+            return (
+                <div className="bg-slate-800 p-6 rounded-xl">
+                    <h3 className="text-2xl font-bold text-white mb-6">Cronograma de Aplicações</h3>
+                    <div className="space-y-4">
+                        {timelineData.map(({days, value}) => (
+                            <div key={days} className="bg-slate-700/50 p-4 rounded-lg flex items-center justify-between">
+                                <p className="text-lg text-slate-300">Disponível para aplicar em <span className="font-bold text-sky-400">{days} dias</span>:</p>
+                                <p className="text-2xl font-bold text-green-400">{formatCurrency(value)}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        };
         
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
@@ -3227,4 +3353,3 @@
     </script>
 </body>
 </html>
-
