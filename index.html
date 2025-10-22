@@ -498,7 +498,7 @@
             return { status: 'Desenquadrado', deviation: deviationPercentage };
         };
 
-        const StatusBadge = ({ status }) => {
+        const StatusBadge = ({ status, deviation }) => {
             const styleMap = {
                 'Enquadrado': 'bg-green-500/20 text-green-400',
                 'Atenção': 'bg-yellow-500/20 text-yellow-400',
@@ -506,9 +506,14 @@
                 'Aguardando Ativos': 'bg-slate-600/50 text-slate-400'
             };
             return (
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styleMap[status] || styleMap['Aguardando Ativos']}`}>
-                    {status}
-                </span>
+                <div className="flex flex-col items-start">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${styleMap[status] || styleMap['Aguardando Ativos']}`}>
+                        {status}
+                    </span>
+                    {status !== 'Aguardando Ativos' && (
+                        <span className="text-xs text-slate-400 mt-1">{deviation.toFixed(2)}% desalinhado</span>
+                    )}
+                </div>
             );
         };
 
@@ -539,8 +544,8 @@
                             const clientsData = querySnapshot.docs.map(doc => {
                                 const client = { id: doc.id, ...doc.data() };
                                 const clientProfile = profilesData.find(p => p.id === client.profileId);
-                                const { status } = calculateFrameworkStatus(client.portfolioData, clientProfile);
-                                return { ...client, status };
+                                const { status, deviation } = calculateFrameworkStatus(client.portfolioData, clientProfile);
+                                return { ...client, status, deviation };
                             });
                             setClients(clientsData);
                             setLoading(false);
@@ -605,7 +610,7 @@
                                             <td className="p-4 text-slate-300">{client.profileName || 'Não definido'}</td>
                                             {user?.role === 'admin' && <td className="p-4 text-slate-300">{client.consultantName}</td>}
                                             <td className="p-4">
-                                                <StatusBadge status={client.status} />
+                                                <StatusBadge status={client.status} deviation={client.deviation} />
                                             </td>
                                             <td className="p-4 flex justify-end items-center space-x-4">
                                                 <button onClick={() => viewClient(client.id)} className="text-sky-400 hover:text-sky-300 font-semibold">Visualizar</button>
@@ -809,7 +814,6 @@
                     currentAllocationByClass[key].percentage = totalValue > 0 ? currentAllocationByClass[key].value / totalValue : 0;
                 });
                 
-                // NEW: Issuer concentration
                 const issuerConcentration = portfolio.reduce((acc, asset) => {
                     const key = asset.Emissor || 'Não Especificado';
                     if(!acc[key]) acc[key] = 0;
@@ -817,7 +821,19 @@
                     return acc;
                 }, {});
 
-                return { totalValue, institutions, currentAllocationByClass, portfolio, issuerConcentration };
+                const allocationByAssetType = portfolio.reduce((acc, asset) => {
+                    const key = asset['Tipo de Ativo'] || 'Não Especificado';
+                    if (!acc[key]) acc[key] = { value: 0, assets: [] };
+                    acc[key].value += asset.Valor;
+                    acc[key].assets.push(asset);
+                    return acc;
+                }, {});
+
+                Object.keys(allocationByAssetType).forEach(key => {
+                    allocationByAssetType[key].percentage = totalValue > 0 ? allocationByAssetType[key].value / totalValue : 0;
+                });
+
+                return { totalValue, institutions, currentAllocationByClass, portfolio, issuerConcentration, allocationByAssetType };
             }, [portfolio]);
 
             if (loading) return <div className="text-center p-8"><Loader className="h-8 w-8 text-sky-400 mx-auto" /></div>;
@@ -917,7 +933,8 @@
                 const wb = XLSX.utils.book_new();
 
                 const classes = ['Renda Fixa Pós', 'Renda Fixa Pré', 'Renda Fixa IPCA', 'Renda Variável', 'Multimercado', 'Fundos Listados', 'Exterior'];
-                
+                const assetTypes = ['Fundo de Investimento', 'CDB', 'LCI', 'LCA', 'Ações', 'FII', 'ETF', 'BDR', 'Previdência'];
+
                 const ws_listas_data = [
                     ["Instituição", "Classes", null, "Renda_Fixa_Pós", "Renda_Fixa_Pré", "Renda_Fixa_IPCA", "Renda_Variável", "Multimercado", "Fundos_Listados", "Exterior"],
                     [INSTITUICOES[0], classes[0], null, 'Soberano', 'Bancário', 'Inflação', 'Long Only', 'Macro', 'FII', 'Renda Variável'],
@@ -937,19 +954,24 @@
                 const ws_listas = XLSX.utils.aoa_to_sheet(ws_listas_data);
                 ws_listas['!cols'] = [{wch:20}, {wch:20}, {wch:5}, {wch:20}, {wch:20}, {wch:20}, {wch:20}, {wch:20}, {wch:20}, {wch:20}];
                 XLSX.utils.book_append_sheet(wb, ws_listas, "LISTAS");
-                
+
+                const ws_tipos_data = [["Tipos de Ativos"], ...assetTypes.map(t => [t])];
+                const ws_tipos = XLSX.utils.aoa_to_sheet(ws_tipos_data);
+                ws_tipos['!cols'] = [{ wch: 25 }];
+                XLSX.utils.book_append_sheet(wb, ws_tipos, "LISTA_TIPOS");
+
                 if(!wb.Workbook) wb.Workbook = {};
                 if(!wb.Workbook.Sheets) wb.Workbook.Sheets = [];
                 wb.Workbook.Sheets.push({ Name: 'LISTAS', Hidden: 1 });
+                wb.Workbook.Sheets.push({ Name: 'LISTA_TIPOS', Hidden: 1 });
 
-                // UPDATED: Added "Emissor"
                 const ws_dados = XLSX.utils.aoa_to_sheet([
                     [], [],
-                    [null, "Instituição", "Número da Conta", "Nome", "Emissor", "Vencimento", "Taxa", "Liquidez", "Valor", "Classe", "Subclasse"]
+                    [null, "Instituição", "Número da Conta", "Nome", "Emissor", "Vencimento", "Taxa", "Liquidez", "Valor", "Classe", "Subclasse", "Tipo de Ativo"]
                 ]);
 
                 const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "0284C7" } } };
-                ['B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3', 'I3', 'J3', 'K3'].forEach(c => {
+                ['B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3', 'I3', 'J3', 'K3', 'L3'].forEach(c => {
                     if(ws_dados[c]) ws_dados[c].s = headerStyle;
                 });
                 
@@ -958,6 +980,7 @@
                     ws_dados[`F${i}`] = { t:'n', z: 'dd/mm/yyyy' };
                     ws_dados[`J${i}`] = { t:'s', v:'', dv: { type: "list", formula1: 'LISTAS!$B$2:$B$8' } };
                     ws_dados[`K${i}`] = { t:'s', v:'', dv: { type: "list", formula1: `INDIRECT(SUBSTITUTE(J${i}," ","_"))` } };
+                    ws_dados[`L${i}`] = { t:'s', v:'', dv: { type: "list", formula1: 'LISTA_TIPOS!$A$2:$A$10' } };
                 }
 
                 if(!wb.Workbook.Names) wb.Workbook.Names = [];
@@ -969,8 +992,7 @@
                 wb.Workbook.Names.push({ Name: "Fundos_Listados", Ref: "'LISTAS'!$I$2:$I$4" });
                 wb.Workbook.Names.push({ Name: "Exterior", Ref: "'LISTAS'!$J$2:$J$3" });
                 
-                // UPDATED: Added column width for "Emissor"
-                ws_dados['!cols'] = [ {wch: 2}, {wch: 20}, {wch: 20}, {wch: 35}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 20}, {wch: 20}];
+                ws_dados['!cols'] = [ {wch: 2}, {wch: 20}, {wch: 20}, {wch: 35}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 25}];
                 XLSX.utils.book_append_sheet(wb, ws_dados, "DADOS");
 
                 XLSX.writeFile(wb, "Planilha_Modelo_Highpar.xlsx");
@@ -994,7 +1016,6 @@
                         vencimentoValue = vcto.toString();
                     }
 
-                    // UPDATED: Added "Emissor" field
                     return {
                         "Instituição": row.Instituição || '', 
                         "Número da Conta": row["Número da Conta"] || '',
@@ -1006,6 +1027,7 @@
                         "Valor": numericValue,
                         "Classe": row.Classe || '', 
                         "Subclasse": row.Subclasse || '',
+                        "Tipo de Ativo": row["Tipo de Ativo"] || '',
                     }
                 }).filter(row => row.Instituição && row.Nome && row.Valor > 0);
                 
@@ -1128,28 +1150,48 @@
         // --- TAB COMPONENTS for ClientDetail ---
         function ConsolidatedView({ analysis }) {
             const [selectedInstitution, setSelectedInstitution] = useState('Todas');
-            
-            const filteredPortfolio = useMemo(() => {
-                if (!analysis) return [];
-                if (selectedInstitution === 'Todas') return analysis.portfolio;
-                return analysis.portfolio.filter(p => (p.Instituição + (p["Número da Conta"] ? ` - ${p["Número da Conta"]}` : '')) === selectedInstitution);
-            }, [analysis, selectedInstitution]);
+            const [viewType, setViewType] = useState('estrategia');
 
             const groupedData = useMemo(() => {
-                if (selectedInstitution !== 'Todas' || !analysis) return null;
-                return Object.entries(analysis.currentAllocationByClass).map(([className, data]) => ({
-                    name: className,
+                if (!analysis) return null;
+                
+                let sourceData;
+                if (viewType === 'estrategia') {
+                    sourceData = analysis.currentAllocationByClass;
+                } else { // tipo
+                    sourceData = analysis.allocationByAssetType;
+                }
+
+                if (selectedInstitution !== 'Todas') {
+                    let filteredPortfolio = analysis.portfolio.filter(p => (p.Instituição + (p["Número da Conta"] ? ` - ${p["Número da Conta"]}` : '')) === selectedInstitution);
+                    sourceData = filteredPortfolio.reduce((acc, asset) => {
+                        const key = viewType === 'estrategia' 
+                            ? asset.Classe + (asset.Subclasse ? ` - ${asset.Subclasse}` : '')
+                            : asset['Tipo de Ativo'] || 'Não Especificado';
+                        
+                        if (!acc[key]) acc[key] = { value: 0, assets: [] };
+                        acc[key].value += asset.Valor;
+                        acc[key].assets.push(asset);
+                        return acc;
+                    }, {});
+                }
+
+                return Object.entries(sourceData).map(([name, data]) => ({
+                    name,
                     value: data.value,
-                    percentage: data.percentage,
-                    assets: analysis.portfolio.filter(p => (p.Classe + (p.Subclasse ? ` - ${p.Subclasse}`: '')) === className)
+                    percentage: analysis.totalValue > 0 ? data.value / analysis.totalValue : 0,
+                    assets: viewType === 'estrategia' 
+                        ? analysis.portfolio.filter(p => (p.Classe + (p.Subclasse ? ` - ${p.Subclasse}`: '')) === name)
+                        : data.assets
                 })).sort((a,b) => b.value - a.value);
-            }, [analysis, selectedInstitution]);
+
+            }, [analysis, selectedInstitution, viewType]);
             
             if (!analysis) {
                 return <div className="text-center p-10 bg-slate-800 rounded-lg"><h3 className="text-lg text-slate-400">Nenhum portfólio carregado. Por favor, carregue a planilha de ativos.</h3></div>
             }
             
-            const totalValue = selectedInstitution === 'Todas' ? analysis.totalValue : filteredPortfolio.reduce((acc, item) => acc + item.Valor, 0);
+            const totalValue = selectedInstitution === 'Todas' ? analysis.totalValue : (groupedData || []).reduce((acc, item) => acc + item.value, 0);
 
             return (
                 <div className="space-y-6">
@@ -1164,17 +1206,20 @@
                                  </button>
                              ))}
                         </div>
-                        <div className="bg-slate-800 p-4 rounded-lg text-right">
-                            <p className="text-sm text-slate-400">Valor Total</p>
-                            <p className="text-2xl font-bold text-white">{formatCurrency(totalValue)}</p>
+                        <div className="text-right">
+                             <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-lg mb-2">
+                                <button onClick={() => setViewType('estrategia')} className={`px-3 py-1 text-xs font-semibold rounded-md ${viewType === 'estrategia' ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Por Estratégia</button>
+                                <button onClick={() => setViewType('tipo')} className={`px-3 py-1 text-xs font-semibold rounded-md ${viewType === 'tipo' ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>Por Tipo</button>
+                            </div>
+                            <div className="bg-slate-800 p-4 rounded-lg">
+                                <p className="text-sm text-slate-400">Valor Total</p>
+                                <p className="text-2xl font-bold text-white">{formatCurrency(totalValue)}</p>
+                            </div>
                         </div>
                     </div>
 
                     <div className="bg-slate-800 rounded-xl shadow-lg overflow-hidden">
-                       {selectedInstitution === 'Todas' ? 
-                           <GroupedAssetTable data={groupedData} totalValue={totalValue} /> : 
-                           <FlatAssetTable portfolio={filteredPortfolio} />
-                       }
+                       <GroupedAssetTable data={groupedData || []} totalValue={totalValue} title={viewType === 'estrategia' ? 'Classe / Subclasse' : 'Tipo de Ativo'} />
                     </div>
                 </div>
             );
@@ -1186,6 +1231,7 @@
                     <tr>
                         <th className="p-4 text-sm font-semibold text-slate-300">Nome do Ativo</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Emissor</th>
+                        <th className="p-4 text-sm font-semibold text-slate-300">Tipo</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Classe / Subclasse</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Vencimento</th>
                         <th className="p-4 text-sm font-semibold text-slate-300">Taxa</th>
@@ -1197,17 +1243,18 @@
                         <tr key={index} className="border-b border-slate-700 last:border-b-0 hover:bg-slate-700/50">
                             <td className="p-4 font-medium text-white">{asset.Nome}</td>
                             <td className="p-4 text-slate-300">{asset.Emissor || 'N/A'}</td>
+                            <td className="p-4 text-slate-300">{asset['Tipo de Ativo'] || 'N/A'}</td>
                             <td className="p-4 text-slate-300">{asset.Classe}{asset.Subclasse ? ` - ${asset.Subclasse}` : ''}</td>
                             <td className="p-4 text-slate-300">{formatDisplayDate(asset.Vencimento)}</td>
                             <td className="p-4 text-slate-300">{asset.Taxa || 'N/A'}</td>
                             <td className="p-4 text-slate-300 text-right font-semibold">{formatCurrency(asset.Valor)}</td>
                         </tr>
-                    )) : <tr><td colSpan="6" className="p-8 text-center text-slate-400">Nenhum ativo para esta conta.</td></tr>}
+                    )) : <tr><td colSpan="7" className="p-8 text-center text-slate-400">Nenhum ativo para esta conta.</td></tr>}
                 </tbody>
             </table>
         );
 
-        const GroupedAssetTable = ({ data, totalValue }) => {
+        const GroupedAssetTable = ({ data, totalValue, title }) => {
             const [expanded, setExpanded] = useState({});
             const toggle = (className) => setExpanded(prev => ({...prev, [className]: !prev[className]}));
 
@@ -1215,7 +1262,7 @@
                 <table className="w-full text-left">
                    <thead className="border-b border-slate-700">
                         <tr>
-                            <th className="p-4 text-sm font-semibold text-slate-300 w-1/2">Classe / Subclasse</th>
+                            <th className="p-4 text-sm font-semibold text-slate-300 w-1/2">{title}</th>
                             <th className="p-4 text-sm font-semibold text-slate-300 text-right">Valor Total</th>
                             <th className="p-4 text-sm font-semibold text-slate-300 text-right">% da Carteira</th>
                         </tr>
@@ -2501,6 +2548,7 @@
             const slideConfigs = [
                 { Component: TitleSlide, props: { client, user }, title: "Capa" },
                 { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
+                { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
                 { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
                 { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
                 { Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" },
@@ -2603,7 +2651,7 @@
                     {analysis ? (
                         <div className="flex flex-col h-full space-y-8">
                             <div className="grid grid-cols-2 gap-8 flex-grow">
-                                <SvgPieChart data={Object.entries(analysis.currentAllocationByClass).map(([name, data]) => ({name, value: data.value}))} title="Distribuição Atual" />
+                                <SvgPieChart data={Object.entries(analysis.currentAllocationByClass).map(([name, data]) => ({name, value: data.value}))} title="Distribuição por Estratégia" />
                                 <SvgPieChart data={recommendedChartData} title="Distribuição Recomendada" />
                             </div>
                             <div className="flex-shrink-0">
@@ -2882,6 +2930,23 @@
             );
         };
         
+        const AssetTypeSlide = ({ analysis }) => {
+             const assetTypeData = useMemo(() => {
+                if (!analysis || !analysis.allocationByAssetType) return null;
+                return Object.entries(analysis.allocationByAssetType)
+                    .map(([name, data]) => ({ name, value: data.value }))
+                    .sort((a, b) => b.value - a.value);
+            }, [analysis]);
+
+            return (
+                 <React.Fragment>
+                    {!assetTypeData ? <p className="text-slate-400">Dados de tipo de ativo não disponíveis.</p> : (
+                         <CssBarChart data={assetTypeData} title="" />
+                    )}
+                </React.Fragment>
+            );
+        };
+        
         const QuotationSlide = ({ redemptions, quotations }) => {
             const totals = useMemo(() => {
                 let totalTela = 0, totalResgate = 0;
@@ -2947,5 +3012,4 @@
     </script>
 </body>
 </html>
-
 
