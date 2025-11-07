@@ -526,60 +526,70 @@
             const [deletingClient, setDeletingClient] = useState(null);
 
             useEffect(() => {
-                if (!user) {
-                    setLoading(false);
-                    return;
-                }
-
-              const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-        const profilesSnapshot = await db.collection('profiles').get();
-        const profilesData = profilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        let clientQuery = db.collection('clients');
-        if (user.role !== 'admin') {
-            clientQuery = clientQuery.where('consultantId', '==', user.uid);
-        }
-
-        const unsubscribeClients = clientQuery.onSnapshot(
-            (querySnapshot) => {
-                const clientsData = querySnapshot.docs.map(doc => {
-                    const client = { id: doc.id, ...doc.data() };
-                    const clientProfile = profilesData.find(p => p.id === client.profileId);
-                    const { status, deviation } = calculateFrameworkStatus(client.portfolioData, clientProfile);
-                    return { ...client, status, deviation };
-                });
-                setClients(clientsData);
-                setLoading(false);
-            },
-            (error) => {
-                console.error("Error fetching clients:", error);
-                setLoading(false);
-            }
-        );
-
-        return unsubscribeClients;
-    } catch (error) {
-        console.error("Error fetching initial dashboard data:", error);
+    if (!user) {
         setLoading(false);
-        return () => {};
+        return;
     }
-};
 
-                        return unsubscribeClients;
-                    } catch (error) {
-                        return () => {};
-                    }
-                };
-                
-                let unsubscribe = () => {};
-                fetchDashboardData().then(unsub => {
-                    if (unsub) unsubscribe = unsub;
-                });
+    // função que busca os dados iniciais e cria o listener em clients
+    const fetchDashboardData = async () => {
+        setLoading(true);
+        try {
+            // busca perfis primeiro (usado para calcular status)
+            const profilesSnapshot = await db.collection('profiles').get();
+            const profilesData = profilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                return () => unsubscribe();
-            }, [user]);
+            // monta a query de clients (filtra por consultor se não for admin)
+            let clientQuery = db.collection('clients');
+            if (user.role !== 'admin') {
+                clientQuery = clientQuery.where('consultantId', '==', user.uid);
+            }
+
+            // cria o listener em tempo real
+            const unsubscribeClients = clientQuery.onSnapshot(
+                (querySnapshot) => {
+                    const clientsData = querySnapshot.docs.map(doc => {
+                        const client = { id: doc.id, ...doc.data() };
+                        const clientProfile = profilesData.find(p => p.id === client.profileId);
+                        const { status, deviation } = calculateFrameworkStatus(client.portfolioData, clientProfile);
+                        return { ...client, status, deviation };
+                    });
+                    setClients(clientsData);
+                    setLoading(false);
+                },
+                (error) => {
+                    console.error("Error fetching clients:", error);
+                    setLoading(false);
+                }
+            );
+
+            // retorna a função de unsubscribe para ser usada no cleanup
+            return unsubscribeClients;
+        } catch (error) {
+            console.error("Error fetching initial dashboard data:", error);
+            setLoading(false);
+            // retorna uma função vazia para manter a assinatura consistente
+            return () => {};
+        }
+    };
+
+    // invoca a função e captura a promise que resolve para o unsubscribe
+    let unsubscribe = () => {};
+    fetchDashboardData().then((unsub) => {
+        if (typeof unsub === 'function') unsubscribe = unsub;
+    }).catch((err) => {
+        console.error("fetchDashboardData failed:", err);
+    });
+
+    // cleanup do useEffect
+    return () => {
+        try {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        } catch (e) {
+            // swallow
+        }
+    };
+}, [user]);
 
             const viewClient = (clientId) => {
                 setSelectedClientId(clientId);
