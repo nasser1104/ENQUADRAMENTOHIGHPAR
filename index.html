@@ -543,23 +543,24 @@
                         }
 
                         const unsubscribeClients = clientQuery.onSnapshot(querySnapshot => {
-                            const clientsData = querySnapshot.docs.map(doc => {
-                                const client = { id: doc.id, ...doc.data() };
-                                const clientProfile = profilesData.find(p => p.id === client.profileId);
-                                const { status, deviation } = calculateFrameworkStatus(client.portfolioData, clientProfile);
-                                return { ...client, status, deviation };
-                            });
-                            setClients(clientsData);
-                            setLoading(false);
-                        }, (error) => {
+    const clientsData = querySnapshot.docs.map(doc => {
+        const client = { id: doc.id, ...doc.data() };
+        const clientProfile = profilesData.find(p => p.id === client.profileId);
+        const { status, deviation } = calculateFrameworkStatus(client.portfolioData, clientProfile);
+        return { ...client, status, deviation };
+    });
+    setClients(clientsData);
+    setLoading(false);
+}, (error) => {
+    console.error("Error fetching clients:", error);
+    setLoading(false);
+});
                             console.error("Error fetching clients:", error);
                             setLoading(false);
                         });
 
                         return unsubscribeClients;
                     } catch (error) {
-                        console.error("Error fetching initial dashboard data:", error);
-                        setLoading(false);
                         return () => {};
                     }
                 };
@@ -756,8 +757,8 @@
                 const fetchRecommendedAssets = async () => {
                     try {
                         const snapshot = await db.collection("recommendedAssets").get();
-                        const assetsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setRecommendedAssets(assetsData);
+const assetsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+setRecommendedAssets(assetsData);
                     } catch (error) {
                         console.error("Error fetching recommended assets:", error);
                     }
@@ -2760,90 +2761,91 @@
             </div>
         );
 
-        function PresentationView({ client, profile, user, analysis, liquidityAnalysis, redemptions, applications, quotations, observations, onClose }) {
-            const [currentSlide, setCurrentSlide] = useState(0);
+      function PresentationView({ client, profile, user, analysis, liquidityAnalysis, redemptions, applications, quotations, observations, onClose }) {
+    const [currentSlide, setCurrentSlide] = useState(0);
 
-            const slideConfigs = useMemo(() => {
-                const configs = [
-                    { Component: TitleSlide, props: { client, user }, title: "Capa" },
-                    { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
-                    { Component: PortfolioLiquiditySlide, props: { liquidityAnalysis }, title: "Análise de Liquidez"},
-                    { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
-                    { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
-                    { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
-                ];
+    const slideConfigs = useMemo(() => {
+        const configs = [
+            { Component: TitleSlide, props: { client, user }, title: "Capa" },
+            { Component: ConsolidatedPositionSlide, props: { analysis, profile }, title: "Posição Consolidada" },
+            { Component: PortfolioLiquiditySlide, props: { liquidityAnalysis }, title: "Análise de Liquidez" },
+            { Component: AssetTypeSlide, props: { analysis }, title: "Concentração por Tipo de Ativo" },
+            { Component: AllocationComparisonSlide, props: { analysis, profile }, title: "Análise de Enquadramento" },
+            { Component: IssuerConcentrationSlide, props: { analysis }, title: "Concentração por Emissor" },
+        ];
 
-                if (observations && observations.trim() !== '') {
-                    configs.push({ Component: ObservationsSlide, props: { observations }, title: "Observações e Estratégia"});
-                }
-
-                configs.push({ Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" });
-                
-                if (Object.keys(redemptions).length > 0 || Object.keys(applications).flat().length > 0) {
-                     configs.push({ Component: ProjectedPortfolioSummarySlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Resumo)" });
-                     configs.push({ Component: ProjectedPortfolioDetailSlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Detalhes)" });
-                }
-
-                if (Object.keys(redemptions).length > 0) {
-                    configs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
-                }
-                return configs;
-            }, [client, user, analysis, profile, liquidityAnalysis, redemptions, applications, quotations, observations]);
-
-            const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
-            const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
-            const handlePrint = () => window.print();
-
-            return (
-                <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
-                    {/* Screen UI: Header and Navigation */}
-                    <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
-                        <h2 className="font-bold text-white">Modo Apresentação</h2>
-                        <div className="flex items-center space-x-4">
-                            <span className="text-sm text-slate-400">Slide {currentSlide + 1} de {slideConfigs.length}</span>
-                            <div className="flex items-center space-x-2">
-                                <button onClick={prevSlide} disabled={currentSlide === 0} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_LEFT} className="h-5 w-5" /></button>
-                                <button onClick={nextSlide} disabled={currentSlide === slideConfigs.length - 1} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_RIGHT} className="h-5 w-5" /></button>
-                            </div>
-                            <button onClick={handlePrint} className="flex items-center bg-sky-600 px-3 py-2 text-sm rounded-lg hover:bg-sky-700"><Icon path={ICONS.PDF} className="h-5 w-5 mr-2"/> Gerar PDF</button>
-                            <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
-                        </div>
-                    </header>
-                    
-                    {/* Screen UI: Interactive Slide View */}
-                    <main className="no-print flex-1 p-4 overflow-y-auto">
-                        <div className="w-full h-full relative">
-                           {slideConfigs.map(({ Component, props }, index) => (
-                                <div
-                                    key={`screen-${index}`}
-                                    className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
-                                >
-                                    <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center">
-                                        <Component {...props} />
-                                    </div>
-                                </div>
-                           ))}
-                        </div>
-                    </main>
-
-                    {/* Print UI: All slides rendered sequentially */}
-                    <div className="printable-content">
-                        {slideConfigs.map(({ Component, props, title }, index) => {
-                           const slideInfo = { current: index + 1, total: slideConfigs.length };
-                           return (
-                               <div key={`print-${index}`} className="presentation-slide">
-                                   {index > 0 && <SlideHeader title={title} />}
-                                   <div className="slide-content-print">
-                                       <Component {...props} />
-                                   </div>
-                                   {index > 0 && <SlideFooter clientName={client.name} slideNumber={slideInfo.current} totalSlides={slideConfigs.length} />}
-                               </div>
-                           );
-                        })}
-                    </div>
-                </div>
-            );
+        if (observations && observations.trim() !== '') {
+            configs.push({ Component: ObservationsSlide, props: { observations }, title: "Observações e Estratégia" });
         }
+
+        configs.push({ Component: RebalancePlanSlide, props: { redemptions, applications }, title: "Plano de Ação" });
+
+        if (Object.keys(redemptions).length > 0 || (Array.isArray(Object.keys(applications).flat()) && Object.keys(applications).flat().length > 0)) {
+            configs.push({ Component: ProjectedPortfolioSummarySlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Resumo)" });
+            configs.push({ Component: ProjectedPortfolioDetailSlide, props: { analysis, redemptions, applications }, title: "Carteira Projetada (Detalhes)" });
+        }
+
+        if (Object.keys(redemptions).length > 0) {
+            configs.push({ Component: QuotationSlide, props: { redemptions, quotations }, title: "Cotação para Resgate" });
+        }
+        return configs;
+    }, [client, user, analysis, profile, liquidityAnalysis, redemptions, applications, quotations, observations]);
+
+    const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
+    const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
+    const handlePrint = () => window.print();
+
+    return (
+        <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
+            {/* Screen UI: Header and Navigation */}
+            <header className="no-print p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 flex-shrink-0">
+                <h2 className="font-bold text-white">Modo Apresentação</h2>
+                <div className="flex items-center space-x-4">
+                    <span className="text-sm text-slate-400">Slide {currentSlide + 1} de {slideConfigs.length}</span>
+                    <div className="flex items-center space-x-2">
+                        <button onClick={prevSlide} disabled={currentSlide === 0} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_LEFT} className="h-5 w-5" /></button>
+                        <button onClick={nextSlide} disabled={currentSlide === slideConfigs.length - 1} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_RIGHT} className="h-5 w-5" /></button>
+                    </div>
+                    <button onClick={handlePrint} className="flex items-center bg-sky-600 px-3 py-2 text-sm rounded-lg hover:bg-sky-700"><Icon path={ICONS.PDF} className="h-5 w-5 mr-2"/> Gerar PDF</button>
+                    <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
+                </div>
+            </header>
+            
+            {/* Screen UI: Interactive Slide View */}
+            <main className="no-print flex-1 p-4 overflow-y-auto">
+                <div className="w-full h-full relative">
+                   {slideConfigs.map(({ Component, props }, index) => (
+                        <div
+                            key={`screen-${index}`}
+                            className={`absolute top-0 left-0 w-full h-full transition-opacity duration-300 ease-in-out ${ index === currentSlide ? 'opacity-100 visible z-10' : 'opacity-0 invisible' }`}
+                        >
+                            <div className="w-full h-full bg-slate-900 p-8 lg:p-12 border border-slate-700 rounded-lg flex flex-col justify-center">
+                                <Component {...props} />
+                            </div>
+                        </div>
+                   ))}
+                </div>
+            </main>
+
+            {/* Print UI: All slides rendered sequentially */}
+            <div className="printable-content">
+                {slideConfigs.map(({ Component, props, title }, index) => {
+                   const slideInfo = { current: index + 1, total: slideConfigs.length };
+                   return (
+                       <div key={`print-${index}`} className="presentation-slide">
+                           {/* keep header for all slides except the Title (index 0) so title slide remains clean */}
+                           {index > 0 && <SlideHeader title={title} />}
+                           <div className="slide-content-print">
+                               <Component {...props} />
+                           </div>
+                           {index > 0 && <SlideFooter clientName={client?.name || ''} slideNumber={slideInfo.current} totalSlides={slideConfigs.length} />}
+                       </div>
+                   );
+                })}
+            </div>
+        </div>
+    );
+}
 
         const TitleSlide = ({ client, user }) => (
             <div className="text-center flex flex-col items-center justify-center h-full">
