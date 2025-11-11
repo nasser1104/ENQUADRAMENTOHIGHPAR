@@ -48,16 +48,24 @@
         /* Hides the print-only content from the screen */
         /* Hides the print-only content from the screen (by moving it off-screen) */
 /* Hides the print-only content from the screen (by moving it off-screen) */
+/* Hides the print-only content from the screen (by moving it off-screen) */
 .printable-content {
-    /* display: none; */ 
-
-    /* Novas regras para "esconder" fora da tela */
     display: block;
-    /* visibility: hidden; <-- REMOVIDO */
     position: absolute;
     z-index: -1;
     top: 0;
     left: -9999px; /* Isso aqui já esconde o conteúdo para o usuário */
+
+    /* --- 👇 NOVO MOLDE 16:9 DE ALTA RESOLUÇÃO 👇 --- */
+    width: 1920px; 
+    height: 1080px;
+    overflow: hidden; /* Garante que nada vaze */
+}
+        /* FORÇA CADA SLIDE A OBEDECER O MOLDE */
+.printable-content .presentation-slide {
+    width: 1920px !important;
+    height: 1080px !important;
+    overflow: hidden !important;
 }
 
         /* STYLES DE IMPRESSÃO (CORRIGIDOS) */
