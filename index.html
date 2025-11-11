@@ -75,72 +75,125 @@
             }
 
             /* Show print-only content */
-            .printable-content {
-                display: block !important;
-            }
-            .presentation-slide {
-                width: 100% !important;
-                /* height: 100vh !important; -- REMOVED FOR BETTER PAGE BREAKS */
-                page-break-after: always !important;
-                display: flex !important;
-                flex-direction: column !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: relative !important;
-                transform: none !important;
-                border: 1px solid #e2e8f0 !important; /* slate-200 */
-                background: #fff !important;
-                color: #0f172a !important; /* slate-900 */
-                overflow: hidden !important; /* Hide overflow in print */
-                padding: 2.5rem !important;
-                min-height: 27cm; /* A bit less than A4 height to ensure footer fits */
-            }
-            .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
-                color: #0f172a !important;
-            }
-            .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
-                background-color: #f8fafc !important; /* slate-50 for backgrounds */
-                border-color: #cbd5e1 !important; /* slate-300 */
-            }
-            .presentation-slide .border-slate-700 {
-                border-color: #cbd5e1 !important; /* slate-300 */
-            }
-            .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
-                color: #1e293b !important; /* slate-800 */
-            }
-            .presentation-slide .text-sky-400, .presentation-slide .text-sky-500 { color: #0ea5e9 !important; }
-            .presentation-slide .text-green-400 { color: #22c55e !important; }
-            .presentation-slide .text-red-400 { color: #ef4444 !important; }
-            .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
-            .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
-            .presentation-slide table {
-                 page-break-inside: avoid !important;
-            }
-            .slide-content-print {
-                flex-grow: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            .slide-header-print {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                border-bottom: 1px solid #cbd5e1;
-                padding-bottom: 1rem;
-                margin-bottom: 1rem; /* Reduced margin */
-                flex-shrink: 0;
-            }
-            .slide-footer-print {
-                text-align: center;
-                border-top: 1px solid #cbd5e1;
-                padding-top: 0.75rem;
-                margin-top: 1rem; /* Reduced margin */
-                font-size: 9px;
-                color: #475569;
-                flex-shrink: 0;
-            }
-        }
+           /* --- INÍCIO DO CÓDIGO CORRIGIDO --- */
+
+    /* 1. ESCONDE a versão de impressão na tela normal */
+    /* Esta é a regra mais importante que estava faltando! */
+    .printable-content {
+      display: none;
+      visibility: hidden;
+    }
+
+    /* 2. REGRAS de impressão */
+    @media print {
+      
+      /* Configurações gerais da página de impressão */
+      body, html {
+        background-color: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        height: auto !important;
+        overflow: visible !important;
+        font-size: 10px; 
+      }
+      
+      /* Esconde tudo que é "no-print" (cabeçalho, botões, etc) */
+      .no-print {
+        display: none !important;
+      }
+
+      /* Garante que o 'main' da tela não atrapalhe */
+      main {
+        overflow: visible !important;
+      }
+
+      /* MOSTRA o conteúdo de impressão */
+      .printable-content {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+      }
+      
+      /* O PULO DO GATO: Regras de cada slide */
+      .presentation-slide {
+        /* FORÇA UMA NOVA PÁGINA ANTES de cada slide */
+        page-break-before: always !important; 
+        
+        /* Tenta não quebrar o slide no meio */
+        page-break-inside: avoid !important; 
+        
+        /* Reseta estilos da tela para garantir */
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: relative !important;
+        transform: none !important;
+        overflow: hidden !important; 
+        
+        /* Estilos de cor para o PDF (do seu código original) */
+        border: 1px solid #e2e8f0 !important; 
+        background: #fff !important;
+        color: #0f172a !important; 
+        padding: 2.5rem !important;
+        min-height: 27cm; 
+      }
+
+      /* EXCEÇÃO IMPORTANTE: Não quebra a página antes do PRIMEIRO slide */
+      .presentation-slide:first-child {
+        page-break-before: auto !important;
+      }
+
+      /* O resto das suas regras de estilo para cores (todas corretas) */
+      .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
+        color: #0f172a !important;
+      }
+      .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
+        background-color: #f8fafc !important; /* slate-50 for backgrounds */
+        border-color: #cbd5e1 !important; /* slate-300 */
+      }
+      .presentation-slide .border-slate-700 {
+        border-color: #cbd5e1 !important; /* slate-300 */
+      }
+      .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
+        color: #1e293b !important; /* slate-800 */
+      }
+      .presentation-slide .text-sky-400, .presentation-slide .text-sky-500 { color: #0ea5e9 !important; }
+      .presentation-slide .text-green-400 { color: #22c55e !impor
+      tant; }
+      .presentation-slide .text-red-400 { color: #ef4444 !important; }
+      .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
+      .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
+      .presentation-slide table {
+          page-break-inside: avoid !important;
+      }
+      .slide-content-print {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .slide-header-print {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #cbd5e1;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+      }
+      .slide-footer-print {
+        text-align: center;
+        border-top: 1px solid #cbd5e1;
+        padding-top: 0.75rem;
+        margin-top: 1rem;
+        font-size: 9px;
+        color: #475569;
+        flex-shrink: 0;
+      }
+    }
+    /* --- FIM DO CÓDIGO CORRIGIDO --- */
     </style>
 </head>
 <body class="bg-slate-900 text-white">
