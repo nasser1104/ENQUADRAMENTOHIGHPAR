@@ -46,9 +46,18 @@
         }
         
         /* Hides the print-only content from the screen */
-        .printable-content {
-            display: none;
-        }
+        /* Hides the print-only content from the screen (by moving it off-screen) */
+.printable-content {
+    /* display: none; */ /* <-- Removemos isso */
+
+    /* Novas regras para "esconder" fora da tela */
+    display: block;
+    visibility: hidden;
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: -9999px;
+}
 
         /* STYLES DE IMPRESSÃO (CORRIGIDOS) */
         @media print {
