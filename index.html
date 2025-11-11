@@ -2781,6 +2781,7 @@ setRecommendedAssets(assetsData);
 
       function PresentationView({ client, profile, user, analysis, liquidityAnalysis, redemptions, applications, quotations, observations, onClose }) {
     const [currentSlide, setCurrentSlide] = useState(0);
+    const [isGenerating, setIsGenerating] = useState(false); // <-- PASSO 2a: ADICIONADO ESTADO DE LOADING
 
     const slideConfigs = useMemo(() => {
         const configs = [
@@ -2811,7 +2812,76 @@ setRecommendedAssets(assetsData);
 
     const nextSlide = () => setCurrentSlide(prev => Math.min(prev + 1, slideConfigs.length - 1));
     const prevSlide = () => setCurrentSlide(prev => Math.max(prev - 1, 0));
-    const handlePrint = () => window.print();
+    
+    // --- 👇 PASSO 2b: FUNÇÃO handlePrint SUBSTITUÍDA 👇 ---
+    const handlePrint = async () => {
+        // 1. Pega os nomes das bibliotecas que acabamos de adicionar
+        const { jsPDF } = window.jspdf;
+        const html2canvas = window.html2canvas;
+
+        // 2. Avisa a aplicação que estamos gerando
+        setIsGenerating(true);
+
+        // 3. Encontra o container escondido que tem TODOS os slides
+        // Usamos 'querySelector' para pegar o elemento, mesmo escondido
+        const printContainer = document.querySelector('.printable-content');
+        
+        // 4. Encontra CADA slide individual dentro dele
+        const slides = printContainer.querySelectorAll('.presentation-slide');
+
+        // 5. Cria um novo documento PDF (paisagem 'l', unidade 'px', tamanho 'a4')
+        const doc = new jsPDF('landscape', 'px', 'a4');
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfHeight = doc.internal.pageSize.getHeight();
+
+        try {
+            // 6. Faz um loop, um slide de cada vez
+            for (let i = 0; i < slides.length; i++) {
+                const slide = slides[i];
+                
+                // 7. Tira a "foto" (canvas) do slide
+                const canvas = await html2canvas(slide, {
+                    scale: 2, // Aumenta a resolução da "foto"
+                    useCORS: true,
+                    // Garante que fundos e cores sejam capturados
+                    backgroundColor: '#ffffff' 
+                });
+                
+                // 8. Converte a foto para um formato de imagem (PNG)
+                const imgData = canvas.toDataURL('image/png');
+                
+                // 9. Calcula o tamanho da imagem para caber na página
+                const imgProps = doc.getImageProperties(imgData);
+                const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+                const width = imgProps.width * ratio;
+                const height = imgProps.height * ratio;
+                
+                // Centraliza a imagem na página
+                const x = (pdfWidth - width) / 2;
+                const y = (pdfHeight - height) / 2;
+
+                // 10. Adiciona a imagem ao PDF
+                doc.addImage(imgData, 'PNG', x, y, width, height);
+
+                // 11. Se não for o último slide, adiciona uma nova página
+                if (i < slides.length - 1) {
+                    doc.addPage();
+                }
+            }
+
+            // 12. Fim do loop, salva o arquivo PDF!
+            doc.save('Relatorio_Highpar.pdf');
+
+        } catch (error) {
+            console.error("Erro ao gerar o PDF:", error);
+            // NÃO use alert() em apps React, pode travar. Use um modal de erro se precisar.
+            // Por agora, só logamos o erro.
+        } finally {
+            // 13. Avisa que terminamos
+            setIsGenerating(false);
+        }
+    };
+    // --- 👆 FIM DA SUBSTITUIÇÃO 👆 ---
 
     return (
         <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col">
@@ -2824,7 +2894,22 @@ setRecommendedAssets(assetsData);
                         <button onClick={prevSlide} disabled={currentSlide === 0} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_LEFT} className="h-5 w-5" /></button>
                         <button onClick={nextSlide} disabled={currentSlide === slideConfigs.length - 1} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-50"><Icon path={ICONS.CHEVRON_RIGHT} className="h-5 w-5" /></button>
                     </div>
-                    <button onClick={handlePrint} className="flex items-center bg-sky-600 px-3 py-2 text-sm rounded-lg hover:bg-sky-700"><Icon path={ICONS.PDF} className="h-5 w-5 mr-2"/> Gerar PDF</button>
+                    
+                    {/* --- 👇 PASSO 3: BOTÃO ATUALIZADO 👇 --- */}
+                    <button 
+                        onClick={handlePrint} 
+                        disabled={isGenerating} 
+                        className="flex items-center bg-sky-600 px-3 py-2 text-sm rounded-lg hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-wait w-32 justify-center"
+                    >
+                        {isGenerating ? (
+                            <Loader className="h-5 w-5 mr-2" />
+                        ) : (
+                            <Icon path={ICONS.PDF} className="h-5 w-5 mr-2"/>
+                        )}
+                        {isGenerating ? 'Gerando...' : 'Gerar PDF'}
+                    </button>
+                    {/* --- 👆 FIM DA ATUALIZAÇÃO DO BOTÃO 👆 --- */}
+                    
                     <button onClick={onClose} className="p-2 rounded-md bg-slate-700 hover:bg-slate-600"><Icon path={ICONS.CLOSE} className="h-5 w-5" /></button>
                 </div>
             </header>
