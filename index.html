@@ -5,27 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enquadramento de Carteira - HIGHPAR</title>
     
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React and Babel for component-based UI -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- PapaParse for CSV handling -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
 
-    <!-- SheetJS/XLSX for Excel file handling -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase v9 Compatibility Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
 
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
@@ -54,7 +50,7 @@
             display: none;
         }
 
-        /* NEW AND IMPROVED PRINT STYLES */
+        /* STYLES DE IMPRESSÃO (CORRIGIDOS) */
         @media print {
             body, html {
                 background-color: #fff !important;
@@ -75,125 +71,73 @@
             }
 
             /* Show print-only content */
-           /* --- INÍCIO DO CÓDIGO CORRIGIDO --- */
-
-    /* 1. ESCONDE a versão de impressão na tela normal */
-    /* Esta é a regra mais importante que estava faltando! */
-    .printable-content {
-      display: none;
-      visibility: hidden;
-    }
-
-    /* 2. REGRAS de impressão */
-    @media print {
-      
-      /* Configurações gerais da página de impressão */
-      body, html {
-        background-color: #fff !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        height: auto !important;
-        overflow: visible !important;
-        font-size: 10px; 
-      }
-      
-      /* Esconde tudo que é "no-print" (cabeçalho, botões, etc) */
-      .no-print {
-        display: none !important;
-      }
-
-      /* Garante que o 'main' da tela não atrapalhe */
-      main {
-        overflow: visible !important;
-      }
-
-      /* MOSTRA o conteúdo de impressão */
-      .printable-content {
-        display: block !important;
-        visibility: visible !important;
-        position: relative !important;
-      }
-      
-      /* O PULO DO GATO: Regras de cada slide */
-      .presentation-slide {
-        /* FORÇA UMA NOVA PÁGINA ANTES de cada slide */
-        page-break-before: always !important; 
-        
-        /* Tenta não quebrar o slide no meio */
-        page-break-inside: avoid !important; 
-        
-        /* Reseta estilos da tela para garantir */
-        width: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: relative !important;
-        transform: none !important;
-        overflow: hidden !important; 
-        
-        /* Estilos de cor para o PDF (do seu código original) */
-        border: 1px solid #e2e8f0 !important; 
-        background: #fff !important;
-        color: #0f172a !important; 
-        padding: 2.5rem !important;
-        min-height: 27cm; 
-      }
-
-      /* EXCEÇÃO IMPORTANTE: Não quebra a página antes do PRIMEIRO slide */
-      .presentation-slide:first-child {
-        page-break-before: auto !important;
-      }
-
-      /* O resto das suas regras de estilo para cores (todas corretas) */
-      .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
-        color: #0f172a !important;
-      }
-      .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
-        background-color: #f8fafc !important; /* slate-50 for backgrounds */
-        border-color: #cbd5e1 !important; /* slate-300 */
-      }
-      .presentation-slide .border-slate-700 {
-        border-color: #cbd5e1 !important; /* slate-300 */
-      }
-      .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
-        color: #1e293b !important; /* slate-800 */
-      }
-      .presentation-slide .text-sky-400, .presentation-slide .text-sky-500 { color: #0ea5e9 !important; }
-      .presentation-slide .text-green-400 { color: #22c55e !impor
-      tant; }
-      .presentation-slide .text-red-400 { color: #ef4444 !important; }
-      .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
-      .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
-      .presentation-slide table {
-          page-break-inside: avoid !important;
-      }
-      .slide-content-print {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-      }
-      .slide-header-print {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #cbd5e1;
-        padding-bottom: 1rem;
-        margin-bottom: 1rem;
-        flex-shrink: 0;
-      }
-      .slide-footer-print {
-        text-align: center;
-        border-top: 1px solid #cbd5e1;
-        padding-top: 0.75rem;
-        margin-top: 1rem;
-        font-size: 9px;
-        color: #475569;
-        flex-shrink: 0;
-      }
-    }
-    /* --- FIM DO CÓDIGO CORRIGIDO --- */
+            .printable-content {
+                display: block !important;
+            }
+            .presentation-slide {
+                width: 100% !important;
+                /* height: 100vh !important; -- REMOVED FOR BETTER PAGE BREAKS */
+                page-break-after: always !important;
+                display: flex !important;
+                flex-direction: column !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                position: relative !important;
+                transform: none !important;
+                border: 1px solid #e2e8f0 !important; /* slate-200 */
+                background: #fff !important;
+                color: #0f172a !important; /* slate-900 */
+                overflow: hidden !important; /* Hide overflow in print */
+                padding: 2.5rem !important;
+                min-height: 27cm; /* A bit less than A4 height to ensure footer fits */
+            }
+            .presentation-slide h1, .presentation-slide h2, .presentation-slide h3, .presentation-slide p, .presentation-slide span, .presentation-slide th, .presentation-slide td, .presentation-slide div {
+                color: #0f172a !important;
+            }
+            .presentation-slide .bg-slate-800, .presentation-slide .bg-slate-700, .presentation-slide .bg-slate-900, .presentation-slide .bg-slate-700\/50 {
+                background-color: #f8fafc !important; /* slate-50 for backgrounds */
+                border-color: #cbd5e1 !important; /* slate-300 */
+            }
+            .presentation-slide .border-slate-700 {
+                border-color: #cbd5e1 !important; /* slate-300 */
+            }
+            .presentation-slide .text-white, .presentation-slide .text-slate-200, .presentation-slide .text-slate-300, .presentation-slide .text-slate-400 {
+                color: #1e293b !important; /* slate-800 */
+            }
+            .presentation-slide .text-sky-400, .presentation-slide .text-sky-500 { color: #0ea5e9 !important; }
+            .presentation-slide .text-green-400 { color: #22c55e !important; }
+            .presentation-slide .text-red-400 { color: #ef4444 !important; }
+            .presentation-slide .text-yellow-400 { color: #f59e0b !important; }
+            .presentation-slide .bg-sky-500 { background-color: #0ea5e9 !important; color: #fff !important; }
+            .presentation-slide table {
+                page-break-inside: avoid !important;
+            }
+            .slide-content-print {
+                flex-grow: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .slide-header-print {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #cbd5e1;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem; /* Reduced margin */
+                flex-shrink: 0;
+            }
+            .slide-footer-print {
+                text-align: center;
+                border-top: 1px solid #cbd5e1;
+                padding-top: 0.75rem;
+                margin-top: 1rem; /* Reduced margin */
+                font-size: 9px;
+                color: #475569;
+                flex-shrink: 0;
+            }
+        }
+        /* --- FIM DA LIMPEZA DO CSS --- */
     </style>
 </head>
 <body class="bg-slate-900 text-white">
@@ -234,6 +178,7 @@
             CHEVRON_UP: "M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z",
             CHEVRON_LEFT: "M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z",
             CHEVRON_RIGHT: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+SHOW MORE
             PLUS: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
             CLOSE: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
             UPLOAD: "M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z",
@@ -309,52 +254,52 @@
             const [page, setPage] = useState('dashboard'); 
             const [selectedClientId, setSelectedClientId] = useState(null);
 
-             useEffect(() => {
-                  let unsubscribeUserDoc = () => {};
-                  const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
-                        unsubscribeUserDoc();
+                 useEffect(() => {
+                      let unsubscribeUserDoc = () => {};
+                      const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+                            unsubscribeUserDoc();
 
-                        if (currentUser) {
-                            const userDocRef = db.collection("users").doc(currentUser.uid);
-                            unsubscribeUserDoc = userDocRef.onSnapshot(async (doc) => {
-                                if (doc.exists) {
-                                    setUser(currentUser);
-                                    setUserData({ uid: currentUser.uid, ...doc.data() });
-                                    setLoading(false);
-                                } else {
-                                    try {
-                                        const role = currentUser.email.toLowerCase().includes('admin') ? 'admin' : 'consultant';
-                                        const name = currentUser.displayName || currentUser.email.split('@')[0];
-                                        await userDocRef.set({
-                                            name: name,
-                                            email: currentUser.email,
-                                            role: role,
-                                        });
-                                    } catch (error) {
-                                        console.error("Failed to auto-create user document:", error);
+                            if (currentUser) {
+                                const userDocRef = db.collection("users").doc(currentUser.uid);
+                                unsubscribeUserDoc = userDocRef.onSnapshot(async (doc) => {
+                                    if (doc.exists) {
                                         setUser(currentUser);
-                                        setUserData(null);
+                                        setUserData({ uid: currentUser.uid, ...doc.data() });
                                         setLoading(false);
+                                    } else {
+                                        try {
+                                            const role = currentUser.email.toLowerCase().includes('admin') ? 'admin' : 'consultant';
+                                            const name = currentUser.displayName || currentUser.email.split('@')[0];
+                                            await userDocRef.set({
+                                                name: name,
+                                                email: currentUser.email,
+                                                role: role,
+                                            });
+                                        } catch (error) {
+                                            console.error("Failed to auto-create user document:", error);
+                                            setUser(currentUser);
+                                            setUserData(null);
+                                            setLoading(false);
+                                        }
                                     }
-                                }
-                            }, (error) => {
-                                 console.error("Error fetching user data snapshot:", error);
-                                 setUser(currentUser);
-                                 setUserData(null);
-                                 setLoading(false);
-                            });
-                        } else {
-                            setUser(null);
-                            setUserData(null);
-                            setLoading(false);
-                        }
-                  });
+                                }, (error) => {
+                                     console.error("Error fetching user data snapshot:", error);
+                                     setUser(currentUser);
+                                     setUserData(null);
+                                     setLoading(false);
+                                });
+                            } else {
+                                setUser(null);
+                                setUserData(null);
+                                setLoading(false);
+                            }
+                      });
 
-                  return () => {
-                        unsubscribeAuth();
-                        unsubscribeUserDoc();
-                  };
-             }, []);
+                      return () => {
+                            unsubscribeAuth();
+                            unsubscribeUserDoc();
+                      };
+                 }, []);
             
             const handleSignOut = () => {
                 auth.signOut();
@@ -376,10 +321,10 @@
                             <h1 className="text-2xl text-red-400 font-bold mb-4">Erro de Perfil</h1>
                             <p className="text-slate-400 mb-6 max-w-md">Não foi possível carregar ou criar os dados do seu perfil. Verifique as regras de segurança do Firebase e tente novamente.</p>
                             <button 
-                                onClick={handleSignOut} 
+                                 onClick={handleSignOut} 
                                 className="px-6 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition-colors"
                             >
-                                Sair
+                                 Sair
                             </button>
                        </div>
                  );
@@ -788,7 +733,7 @@
                         <form onSubmit={handleSubmit} className="space-y-4">
                              <input type="text" placeholder="Nome do Cliente" value={clientName} onChange={e => setClientName(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-sky-500" required />
                             <select value={profileId} onChange={e => setProfileId(e.target.value)} className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-sky-500" required>
-                                <option value="">Selecione um Perfil</option>
+                                 <option value="">Selecione um Perfil</option>
                                 {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                             {user?.role === 'admin' && (
@@ -995,7 +940,6 @@ setRecommendedAssets(assetsData);
                     return acc;
                 }, {});
             }, [applications]);
-            
             const handleSaveObservations = async () => {
                 if (!client) return;
                 setSaveStatus('Salvando...');
